@@ -10,8 +10,11 @@ node_modules/
 .nuxt/
 .output/
 dist/
+*.tsbuildinfo
 opencode.jsonc
 .harness-unadopt-backup/
+notes/
+.claude/
 
 # agent scratch space (T-J12). Temporary files go in .harness/scratch/, never
 # in the project root (where dod.sh step 1 would report them as uncommitted

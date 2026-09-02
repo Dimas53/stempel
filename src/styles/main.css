@@ -1,0 +1,383 @@
+:root {
+  /* Brand */
+  --pep-primary-blue: #2a8fd2;
+  --pep-primary-blue-hover: #247ab3;
+  --pep-primary-blue-soft: #e5f2fa;
+  /* Toned down twice now — first from the navy(#024)->skyblue jump (muddy
+     middle in sRGB), then again because the dark end still read as too
+     much contrast next to the MarcoPolo reference's fairly even blue. */
+  --pep-panel-gradient: linear-gradient(135deg, #4bafe0 0%, #2a8fd2 60%, #1f6fa0 100%);
+
+  /* Neutrals */
+  --pep-white: #ffffff;
+  --pep-ink: #1a2230;
+  --pep-mute: #6b7688;
+  --pep-line: #c7cedb;
+  --pep-line-soft: #dfe4ec;
+  --pep-panel-gray: #eef1f6;
+
+  /* Accent — gold (pause) */
+  --pep-gold: #c8a04b;
+  --pep-gold-mid: #dab264;
+  --pep-gold-light: #e3c996;
+  --pep-gold-bg-soft: #fffab4;
+  /* Trying a plain two-stop diagonal instead of the repeating-stripe
+     4-stop version — that one read as a "premium/shiny" banner effect
+     the user didn't want. Not confirmed final yet.
+     Static reference only — .btn-anmelden builds its own gradient
+     inline from --pep-gold-gradient-angle directly, since chaining an
+     animated angle through a second custom property broke the
+     transition (see the Login section below). */
+  --pep-gold-gradient: linear-gradient(135deg, #f6d27a, #c9922e);
+
+  /* Accent — green (checkout) */
+  --pep-green: #d2f0c8;
+
+  /* Accent — red (errors) */
+  --pep-red: #ff8c8c;
+
+  /* Structure */
+  --pep-radius: 4px; /* matches Pepito's real desktop-scale buttons */
+  --pep-radius-lg: 6px; /* kiosk-scale controls — 10px read as too soft/rounded next to the reference */
+  --pep-frame-radius: 100px; /* inner corners of the blue panel, where it meets the white strip */
+  --pep-transition: color 0.15s ease-in-out, background-color 0.15s ease-in-out,
+    border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1); /* strong ease-out for UI */
+  --pep-gold-gradient-angle: 135deg;
+}
+
+/* Registered so the angle can be smoothly transitioned (a plain custom
+   property can't be interpolated by the browser without this) — swaps
+   the light/dark corners of gold buttons on press instead of just
+   dimming, per the real Pepito hover reference's "light sweeps around"
+   feel. */
+@property --pep-gold-gradient-angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 135deg;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family:
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    Helvetica,
+    Arial,
+    sans-serif;
+  color: var(--pep-ink);
+}
+
+/* ==========================================================================
+   Shared / cross-view
+   ========================================================================== */
+
+/* Placeholder used by CheckView and CheckoutView (M3/M4 not built yet) —
+   identical on both, kept as one shared rule instead of duplicating it. */
+.placeholder-screen {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: var(--pep-panel-gradient);
+  color: var(--pep-white);
+}
+
+.placeholder-hint {
+  color: var(--pep-white);
+  opacity: 0.75;
+  font-size: 0.9rem;
+}
+
+/* ScreenLabel.vue — plain caption naming the current screen, not a
+   button, so no background/pill/shadow that would invite a tap. */
+.screen-label {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--pep-mute);
+}
+
+/* ==========================================================================
+   LoginView (/chronology)
+   ========================================================================== */
+
+.kiosk {
+  display: flex;
+  width: 100%;
+  height: 100vh;
+}
+
+.panel {
+  position: relative;
+  flex: 0 0 75%;
+  background-image: var(--pep-panel-gradient);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  /* Only the inner edge (against the white strip) is rounded — the outer
+     edges sit flush against the real viewport, nothing to round them
+     against. Matches the reference's blue block, not a device-frame
+     wrapper around the whole page. Bottom-right left square on purpose —
+     trying rounded-top-only to see if it reads more interesting. */
+  border-top-right-radius: var(--pep-frame-radius);
+  /* filter, not box-shadow: box-shadow would get clipped by this
+     element's own overflow:hidden (needed for the gradient + radius). */
+  filter: drop-shadow(6px 0 20px rgba(15, 50, 90, 0.3));
+}
+
+/* Portrait tablet: 80% blue makes the white strip cramped. 75% reads
+   better once the viewport is taller than it is wide. */
+@media (orientation: portrait) {
+  .panel {
+    flex-basis: 70%;
+  }
+}
+
+.pin-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: min(360px, 80%);
+}
+
+.pin-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.pin-icon {
+  position: absolute;
+  left: 1rem;
+  color: var(--pep-mute);
+  pointer-events: none;
+}
+
+.pin-field.has-error .pin-icon {
+  color: var(--pep-red);
+}
+
+.pin-input {
+  width: 100%;
+  padding: 1rem 1.25rem 1rem 2.75rem;
+  font-size: 1.1rem;
+  text-align: center;
+  letter-spacing: 0.3em;
+  border: none;
+  border-radius: var(--pep-radius-lg);
+  background: var(--pep-white);
+  color: var(--pep-ink);
+  box-shadow: 0 3px 10px rgba(10, 40, 80, 0.18);
+  transition: var(--pep-transition);
+  /* type="tel" (not "password") is what actually gets the numeric keypad
+     on iOS — Safari ignores inputmode="numeric" on password fields. This
+     masks it visually instead, WebKit-only but that's exactly the target
+     runtime (iPad). */
+  -webkit-text-security: disc;
+}
+
+.pin-input::placeholder {
+  color: var(--pep-mute);
+  letter-spacing: normal;
+}
+
+.pin-field.has-error .pin-input {
+  outline: 2px solid var(--pep-red);
+}
+
+.error-text {
+  margin: -8px 0 0;
+  padding: 0.5rem 0.75rem;
+  background: var(--pep-red);
+  color: var(--pep-ink);
+  border-radius: var(--pep-radius-lg);
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.btn-anmelden {
+  min-height: 56px;
+  padding: 1rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--pep-ink);
+  /* Referencing --pep-gold-gradient-angle directly rather than through
+     the --pep-gold-gradient token — chaining the animated angle through
+     a second custom property broke the transition (Chrome kept
+     resolving the nested var() to its pre-animation value on
+     background-image specifically). */
+  background: linear-gradient(var(--pep-gold-gradient-angle), #f6d27a, #c9922e);
+  border: none;
+  border-radius: var(--pep-radius-lg);
+  /* State 1 (default): gradient only, no shadow, no size change. */
+  cursor: pointer;
+  transition:
+    var(--pep-transition),
+    --pep-gold-gradient-angle 650ms var(--ease-out),
+    transform 140ms var(--ease-out),
+    box-shadow 140ms var(--ease-out);
+}
+
+/* State 2 (hover, mouse only): gradient swaps, a thin light shadow
+   appears for the first time, button shrinks a couple pixels — as if
+   touched. Scale, not translateY: translating the box on :hover shifts
+   the hit box under a stationary cursor near an edge and flickers
+   hover on/off in a loop. Scale shrinks from the center instead, which
+   is a far smaller edge-position change and doesn't trigger that. */
+@media (hover: hover) and (pointer: fine) {
+  .btn-anmelden:hover {
+    --pep-gold-gradient-angle: 315deg;
+    transform: scale(0.985);
+    box-shadow: 0 2px 5px rgba(90, 60, 10, 0.22);
+  }
+}
+
+/* State 3 (press/active — the real touch trigger): shrinks further, and
+   the shadow gets MORE visible, darker, tighter — not fainter. Gradient
+   doesn't move again, it already swapped at hover/first touch. */
+.btn-anmelden:active {
+  --pep-gold-gradient-angle: 315deg;
+  transform: scale(0.965);
+  box-shadow: 0 1px 2px rgba(70, 45, 10, 0.45);
+}
+
+.btn-anmelden:focus-visible {
+  outline: 2px solid var(--pep-primary-blue);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn-anmelden:hover,
+  .btn-anmelden:active {
+    transform: none;
+  }
+}
+
+.credits {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.8);
+  text-align: center;
+}
+
+.strip {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.strip-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 30px;
+}
+
+.logo img {
+  height: 65px;
+  display: block;
+}
+
+.strip-card {
+  width: 100%;
+  max-width: 260px;
+  padding: 20px 24px;
+  border-radius: 16px;
+  background: var(--pep-primary-blue-soft);
+  text-align: center;
+  overflow: hidden;
+  transition: background-color 250ms ease, transform 200ms var(--ease-out);
+}
+
+/* Flips to the full brand blue while a message is active, so the update
+   reads as a state change rather than a quiet text swap. */
+.strip-card--active {
+  background: var(--pep-primary-blue);
+  transform: scale(1.04);
+}
+
+.strip-eyebrow {
+  margin: 0 0 6px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--pep-primary-blue);
+  transition: color 250ms ease;
+}
+
+.strip-message {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--pep-ink);
+  line-height: 1.4;
+  transition: color 250ms ease;
+}
+
+.strip-card--active .strip-eyebrow,
+.strip-card--active .strip-message {
+  color: var(--pep-white);
+}
+
+.strip-divider {
+  width: 40px;
+  height: 1px;
+  background: var(--pep-line);
+  margin-bottom: 16px;
+}
+
+/* Each message swap slides in from below / out toward the top, like a
+   ticker handing off to the next line. */
+.strip-msg-enter-active,
+.strip-msg-leave-active {
+  transition: transform 200ms var(--ease-out), opacity 200ms var(--ease-out);
+}
+
+.strip-msg-enter-from {
+  opacity: 0;
+  transform: translateY(14px);
+}
+
+.strip-msg-leave-to {
+  opacity: 0;
+  transform: translateY(-14px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .strip-card--active {
+    transform: none;
+  }
+
+  .strip-msg-enter-from,
+  .strip-msg-leave-to {
+    transform: none;
+  }
+}

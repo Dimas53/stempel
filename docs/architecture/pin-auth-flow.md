@@ -8,9 +8,14 @@ Handles PIN input, validation, and routing on the `/chronology` screen. This is 
 
 | File | Responsibility |
 |------|---------------|
-| `src/views/LoginView.vue` | PIN input screen, submit handler |
-| `src/components/PinInput.vue` | Masked input field with autocomplete off |
-| `src/api/timeClock.ts` | `submitPin()` — validates PIN against mock users |
+| `src/views/LoginView.vue` | PIN input screen, submit handler, inline error display, inline welcome message (temporary — see Gotchas) |
+| `src/api/timeClock.ts` | `submitPin()` — validates PIN and DayState against mocks, throws `PinError` (E1–E4) |
+| `src/mocks/dayState.ts` | In-memory `DayState` store keyed by userId, single access point (`getDayState`/`setDayState`) |
+| `src/composables/useSession.ts` | Holds the current logged-in `MockUser` across route changes (menu/pause/checkout need to know who's active) |
+
+No separate `PinInput.vue` component — the input is only used on one screen,
+so it's inline in `LoginView.vue` for now. Extract it only if a second
+place ends up needing a PIN field.
 
 ## Flow
 
@@ -37,3 +42,8 @@ User enters PIN → clicks "Anmelden"
 - Do not use `v-model` with `type="password"` and `autocomplete="off"` without testing — some browsers still try to autofill
 - PIN comparison must be exact (string match, no trimming of leading zeros)
 - Error messages appear below the PIN field, not as toasts — keeps the login screen stable
+- The "Willkommen" message on checkin is currently a plain inline element in
+  `LoginView.vue` with a `setTimeout`, not the real Toast overlay — replace
+  with the actual Toast component from `docs/architecture/toast-system.md`
+  when that milestone is built. Same for E3/E4/E5, which `submitPin()`
+  already throws correctly but aren't exercised by any UI yet outside E1/E2.
