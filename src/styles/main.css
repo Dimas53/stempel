@@ -7,6 +7,15 @@
      middle in sRGB), then again because the dark end still read as too
      much contrast next to the MarcoPolo reference's fairly even blue. */
   --pep-panel-gradient: linear-gradient(135deg, #4bafe0 0%, #2a8fd2 60%, #1f6fa0 100%);
+  /* Darkened further from the gradient's own darkest stop (#1f6fa0) —
+     used as a fixed focus-ring color on the white inputs (see .pin-input
+     / .notiz-input :focus-visible) so it always reads as "this app's
+     blue", not whatever the browser/OS's native focus color happens to
+     be that session (Chrome's own default, an autofill highlight, a
+     non-default macOS accent color, etc. — all of which are outside this
+     stylesheet's control and were the actual cause of the ring
+     sometimes rendering yellow instead of blue). */
+  --pep-focus-ring: #175378;
 
   /* Neutrals */
   --pep-white: #ffffff;
@@ -334,14 +343,6 @@ body {
   background-image: var(--pep-panel-gradient);
 }
 
-/* Portrait tablet: 80% blue makes the white strip cramped. 75% reads
-   better once the viewport is taller than it is wide. */
-@media (orientation: portrait) {
-  .panel {
-    flex-basis: 70%;
-  }
-}
-
 .credits {
   position: absolute;
   bottom: 24px;
@@ -352,6 +353,42 @@ body {
   color: rgba(255, 255, 255, 0.8);
   text-align: center;
 }
+
+/* Portrait tablet: 80% blue makes the white strip cramped. 75% reads
+   better once the viewport is taller than it is wide. */
+@media (orientation: portrait) {
+  .panel {
+    flex-basis: 70%;
+  }
+}
+
+/* Below iPad Pro width the strip's fixed-ish content (logo + message
+   card) needs relatively more of the split to stay comfortable — without
+   this the same 70/75% split that works at 1024px+ leaves the strip
+   uncomfortably tight on Air/mini-sized tablets even after the min-width
+   fix above stops it from actually overflowing. */
+@media (max-width: 900px) {
+  .panel {
+    flex-basis: 68%;
+  }
+}
+
+@media (max-width: 900px) and (orientation: portrait) {
+  .panel {
+    flex-basis: 67%;
+  }
+}
+
+@media (max-width: 780px) and (orientation: portrait) {
+  .panel {
+    flex-basis: 66%;
+  }
+  .credits {
+    bottom: 15px;
+  }
+}
+
+
 
 /* Full-bleed mode, click feedback on the "Anmelden" button (see
    LoginView.vue's spawnRipple). Previous attempts: a filled white disc
@@ -484,6 +521,17 @@ body {
 .strip {
   position: relative;
   flex: 1;
+  /* Flex items default to min-width: auto, i.e. never narrower than their
+     own content (here: the logo's intrinsic width). Below a certain
+     viewport width that floor exceeded the space .panel left for this
+     column, and the strip refused to shrink — pushing the whole kiosk
+     wider than the viewport (horizontal scroll/drag-pan on the real
+     device). min-width: 0 removes that floor so flex-basis (set by
+     --pep-panel-basis on .panel) is what actually controls the split;
+     everything inside (logo, card, text) is sized to fit via
+     container-query units below instead of forcing its own room. */
+  min-width: 0;
+  container-type: inline-size;
   /* No explicit background in full-bleed mode on purpose: .panel's
      drop-shadow filter bleeds slightly past its own rounded corner, and
      an opaque .strip clips that bleed with a hard rectangular edge right
@@ -493,7 +541,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px;
+  padding: clamp(14px, 6cqw, 24px);
 }
 
 /* Card mode doesn't have this problem — .kiosk--card resets .panel's
@@ -508,18 +556,26 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 40px;
+  gap: clamp(20px, 12cqw, 40px);
+  width: 100%;
 }
 
+/* Sized from the strip's own available width (container query units, see
+   .strip's container-type above) instead of a fixed pixel height. A
+   fixed height forced a fixed intrinsic width that .strip could never
+   shrink below — this scales down smoothly with the column instead of
+   setting a hard floor. */
 .logo img {
-  height: 65px;
+  width: clamp(160px, 44cqw, 220px);
+  height: auto;
+  max-width: 100%;
   display: block;
 }
 
 .strip-card {
   width: 100%;
   max-width: 260px;
-  padding: 20px 24px;
+  padding: clamp(14px, 6cqw, 20px) clamp(16px, 7cqw, 24px);
   border-radius: 16px;
   background: var(--pep-primary-blue-soft);
   text-align: center;
@@ -562,7 +618,10 @@ body {
 
 .strip-message {
   margin: 0;
-  font-size: 1.05rem;
+  /* Floor kept close to the ceiling (0.95rem vs. 1.05rem) — this is read
+     from across a room on a wall-mounted kiosk, so it stays readable
+     rather than shrinking to fit the narrowest strip. */
+  font-size: clamp(0.95rem, 4.6cqw, 1.05rem);
   font-weight: 700;
   color: var(--pep-ink);
   line-height: 1.4;
@@ -634,7 +693,17 @@ body {
 
 .kiosk--card {
   width: min(1000px, 95vw);
-  height: min(500px, 90vh);
+  /* One height for all three screens, not one per view — Login's content
+     is short but Checkout's (name + summary + note field + button) is
+     tall, and these panels swap via a swipe transition, so a
+     content-driven auto-height would make the card visibly resize
+     between screens mid-swipe. 500px fit Login but was too short for
+     Checkout's content, which then collided with .credits below (see
+     .kiosk--card .panel-view). 620px is sized to Checkout, the tallest
+     of the three, at the narrowest card width this mode reaches (iPad
+     mini portrait) — clamped to 90vh so it still fits inside genuinely
+     short viewports. */
+  height: min(620px, 90vh);
   border-radius: 20px;
   overflow: hidden;
   box-shadow: 0 24px 60px rgba(20, 40, 70, 0.25);
@@ -665,6 +734,21 @@ body {
    to fill the column's width (matching a reference mock literally), and
    a full-width PIN input for a few digits just looked wrong. Only the
    outer frame changes between modes, not how the form is proportioned. */
+
+/* .credits stays position: absolute + pinned to the bottom, same as
+   full-bleed mode (see .credits above) — that's the look this is meant
+   to match. What's different in card mode: the panel is a fixed, much
+   shorter height (not a full 100vh), and on the Checkout screen (the
+   tallest content of the three) the centered content could otherwise
+   grow tall enough to reach into .credits' pinned spot and overlap it.
+   Reserving bottom padding here shrinks the box .panel-view centers its
+   content within, so the centered content is structurally kept clear of
+   the strip along the bottom where .credits lives — same pinned-to-the-
+   bottom look, no possible overlap regardless of exactly how tall any
+   given screen's content is. */
+.kiosk--card .panel-view {
+  padding: 32px 24px 64px;
+}
 
 .layout-toggle {
   position: fixed;
@@ -875,6 +959,14 @@ body {
   letter-spacing: normal;
 }
 
+/* Fixed color/width regardless of browser or OS — see --pep-focus-ring.
+   Thinner than the buttons' 2px (an input's own white fill against the
+   blue panel already reads clearly without needing as heavy a ring). */
+.pin-input:focus-visible {
+  outline: 1.5px solid var(--pep-focus-ring);
+  outline-offset: 2px;
+}
+
 .pin-field.has-error .pin-input {
   outline: 2px solid var(--pep-red);
 }
@@ -998,7 +1090,7 @@ body {
    plans to revisit the icons and time formatting further later. */
 .checkout-summary {
   width: 100%;
-  margin-bottom: 24px;
+  margin-bottom: 20px;
   padding: 0 20px;
   background: rgba(255, 255, 255, 0.08);
   backdrop-filter: blur(16px);
@@ -1123,13 +1215,22 @@ body {
   flex-shrink: 0;
 }
 
+/* Anchored to the icon's LEFT edge and growing rightward (not centered
+   on it) — .info-tooltip sits near the left edge of a narrow column
+   (.notiz-field), so a bubble centered on it stuck out past the panel's
+   own left edge and got cropped by .panel's overflow: hidden. Growing
+   rightward instead keeps it inside the column, where there's actually
+   room. Widened (240px → up to 300px, still capped relative to the
+   viewport so it can't do the same thing in reverse on the narrowest
+   phones-in-portrait-tablet case) so the copy wraps to 2–3 lines instead
+   of 4. */
 .info-tooltip-bubble {
   position: absolute;
-  left: 50%;
+  left: -6px;
   bottom: calc(100% + 10px);
-  transform: translateX(-50%) translateY(4px);
+  transform: translateY(4px);
   width: max-content;
-  max-width: 240px;
+  max-width: min(300px, 78vw);
   padding: 10px 12px;
   background: var(--pep-ink);
   color: var(--pep-white);
@@ -1145,13 +1246,16 @@ body {
   z-index: 2;
 }
 
-/* Small arrow pointing from the bubble down at the icon that triggered it. */
+/* Small arrow pointing from the bubble down at the icon that triggered
+   it — sits near the bubble's own left edge (roughly where the icon
+   inside .info-tooltip actually is) rather than the bubble's center,
+   now that the bubble itself grows rightward instead of being centered
+   on that icon. */
 .info-tooltip-bubble::after {
   content: '';
   position: absolute;
   top: 100%;
-  left: 50%;
-  transform: translateX(-50%);
+  left: 22px;
   border: 6px solid transparent;
   border-top-color: var(--pep-ink);
 }
@@ -1159,7 +1263,7 @@ body {
 .info-tooltip:hover .info-tooltip-bubble,
 .info-tooltip:focus-visible .info-tooltip-bubble {
   opacity: 1;
-  transform: translateX(-50%) translateY(0);
+  transform: translateY(0);
 }
 
 .info-tooltip:focus-visible {
@@ -1189,5 +1293,10 @@ body {
 
 .notiz-input::placeholder {
   color: var(--pep-mute);
+}
+
+.notiz-input:focus-visible {
+  outline: 1.5px solid var(--pep-focus-ring);
+  outline-offset: 2px;
 }
 

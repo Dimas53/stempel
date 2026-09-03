@@ -923,3 +923,61 @@ for one button.** Two changes, same conversation:
 Verified live: Checkout → glow visibly grows from the panel's top-left
 corner diagonally toward the button → button flips to "Ausgecheckt"
 immediately, no dialog → toast → redirect, same as before.
+
+## Session 2026-09-03 — Tablet responsive audit + fixes, fixed focus ring, tooltip reposition
+
+**Done (styles only, `src/styles/main.css` — no logic/markup touched):**
+
+- **Horizontal overflow across iPad breakpoints, root-caused and fixed.**
+  `.strip` (flex: 1, no min-width) hit the flexbox min-width:auto trap —
+  it refused to shrink below its content's intrinsic width (the logo's
+  fixed `height: 65px` implied ~224px), so once `.panel`'s flex-basis
+  left less room than that, the kiosk overflowed the viewport — on a
+  real touch device this reads as the whole page pannable/draggable
+  sideways. Fixed with `.strip { min-width: 0; container-type:
+  inline-size; }` plus sizing the logo/strip-card/message from the
+  strip's own container-query width instead of fixed px, so everything
+  inside shrinks with the column instead of forcing a floor under it.
+- **Panel/strip ratio**: was two disconnected rules (75/25 full-bleed,
+  70/30 portrait-only; 62/38 fixed in card mode, no orientation
+  awareness at all). Added width+orientation-tiered breakpoints (≤900px,
+  ≤780px+portrait) so Air/mini get relatively more strip room instead of
+  the status message wrapping to 3 lines.
+- **Card mode height** (`.kiosk--card`): was a flat `500px` for all
+  three screens (Login/Check/Checkout) — fit Login, too short for
+  Checkout's content, which then collided with `.credits` (absolutely
+  positioned, doesn't yield to in-flow content). Bumped to `min(620px,
+  90vh)` — same height on all three screens on purpose (they swap via a
+  swipe transition, so a per-view auto-height would visibly resize the
+  card mid-swipe). `.credits` stays pinned-to-bottom (position: absolute,
+  matching full-bleed mode's look) rather than pushed into flow —
+  overlap is instead made structurally impossible by reserving bottom
+  padding on `.kiosk--card .panel-view` so centered content can't reach
+  down into where `.credits` sits.
+- Verified live via Chrome device-size emulation across all 12
+  combinations (iPad Pro/Air/mini × portrait/landscape × full/card) on
+  Login, Check, and Checkout with a real logged-in user (name + filled
+  table) — no horizontal or vertical scroll, no overlap, anywhere.
+- **Fixed focus ring** on `.pin-input`/`.notiz-input`: neither had an
+  explicit `:focus-visible` rule, so the ring users saw was whatever the
+  browser/OS defaulted to that session (Chrome's own blue, an autofill
+  highlight, a non-default macOS accent color) — reported as "sometimes
+  yellow, blue again after reload." Added an explicit `:focus-visible`
+  outline in a new `--pep-focus-ring` token (`#175378`, darkened further
+  from `--pep-panel-gradient`'s own darkest stop) so it's fixed
+  regardless of browser/OS state, matching the pattern already used on
+  `.btn-gold`/`.btn-green`/`.info-tooltip`.
+- **`.info-tooltip-bubble` (Notiz field hint) repositioning**: was
+  centered (`left: 50%; transform: translateX(-50%)`) on `.info-tooltip`,
+  which sits near the left edge of a narrow column — centering a 240px
+  bubble there pushed its left half past the panel's own edge, where
+  `overflow: hidden` cropped it. Changed to grow rightward from the icon
+  (`left: -6px`, no centering transform) instead, and widened
+  (`max-width: min(300px, 78vw)`) so the copy wraps to 2-3 lines instead
+  of 4. Arrow (`::after`) repositioned from bubble-center to
+  bubble-left-edge to match.
+
+**Not done / explicitly out of scope this session:** a portrait-only
+alternate full-bleed layout (blue panel on top, white strip along the
+bottom instead of the side, per a sketch) — user wants to prototype this
+next; committed the above first as a checkpoint before trying it.
