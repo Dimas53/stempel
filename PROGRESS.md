@@ -347,3 +347,579 @@ collision trade-off this creates in `design.md`. Verified: 0 `<style>`
 tags remain in `src/`, type-check and build clean, visually identical in
 the browser, `/chronology/check` placeholder renders correctly with the
 new shared classes.
+
+## Session 2026-09-02 — Menu screen (M3), shared shell, route slide
+
+Built the Menu / Pause beenden screen for real (M3), pulling requirements
+from the raw ticket text the user pasted in (matches `notes/stempelmaske-tz.md`,
+no surprises). Refactored first since a second real screen made the
+duplication obvious:
+- New `src/components/KioskShell.vue` — extracted the blue panel + white
+  strip (logo, status card, divider, screen label, credits) out of
+  `LoginView.vue` into a reusable shell taking `screen-label`,
+  `status-eyebrow`, `status-message`, `status-active` props and a default
+  slot for the panel content. `LoginView.vue` now just supplies the PIN
+  form into that slot.
+- `.btn-anmelden` renamed to `.btn-gold` (generic, reusable) since Pause
+  starten/beenden need the identical gold treatment. Added `.btn-green`
+  with the same structural recipe (thin shadow + `scale(0.985)` hover,
+  darker/tighter shadow + `scale(0.965)` active) but a flat color swap —
+  no second green tone was given to build a gradient from.
+- `CheckView.vue` built out fully: reads `getCurrentDayState()` (new
+  export in `api/timeClock.ts`) on mount to decide Menu (not paused) vs
+  Pause beenden (paused) — two buttons vs one, per the ticket. Toast
+  texts match the ticket verbatim for Pause starten
+  ("[Vorname] [Nachname], du bist jetzt in der Pause, [Uhrzeit]"); Pause
+  beenden's text is still the placeholder from the open-questions list
+  (not in the ticket, needs confirmation). `startPause`/`endPause` now
+  return the timestamp they stamped so the UI displays exactly what was
+  persisted instead of recomputing `new Date()` a second time.
+- `CheckoutView.vue` lightly updated to use the shared shell too, so it's
+  visually consistent while M4 (the real table) isn't built yet.
+- Route-level slide transition finally implemented in `App.vue`
+  (`<Transition name="route-slide" mode="out-in">`) — this was explicitly
+  deferred earlier for lack of a second real screen; now that Menu exists
+  it has real spatial meaning. Sequential, not overlapping — see
+  `docs/design.md` Motion section for the trade-off.
+- Icons added: `Pause` (Pause starten), `Play` (Pause beenden — "pause-out"),
+  `LogOut` (Zum Checkout), all from `@lucide/vue`.
+
+**Verified live, full cycle**, working around the real 60s stamp cooldown
+by actually waiting it out (not faking timestamps): PIN → checkin toast →
+PIN again → Menu (Thomas Weber, two buttons) → Pause starten → toast →
+redirect to Login → PIN again → Pause beenden screen (single yellow
+button) → Pause beenden → toast → redirect → PIN again → back to Menu
+(confirms `isPaused` correctly flips back false). "Zum Checkout" verified
+navigating to the (placeholder) checkout screen in the same shell.
+
+**Debugging note, not a code bug:** both the user and I independently hit
+what looked like a stuck E3 ("too fast") that wouldn't clear even after
+waiting — root cause was Vite HMR/full-page reloads firing (from me
+actively editing files) while testing was happening in the same browser
+tab, which resets the in-memory `dayStates` Map and makes the *next* PIN
+submission look like a fresh checkin, restarting the 60s clock. Not a
+logic error — confirmed by waiting a real, uninterrupted 60s and getting
+the correct Menu screen every time.
+
+**Temporary, must revert:** `MIN_STAMP_INTERVAL_MS` in `api/timeClock.ts`
+dropped from 60s to 5s purely so manual click-through testing doesn't
+require actually waiting a minute at each step. Flagged with a `TEMP`
+comment and in `docs/roadmap.md`'s M5 checklist — revert to 60_000
+before this is considered done.
+
+Also bumped the toast display duration (2000-2500ms → 3500ms) on
+Login/Check per user feedback that the confirmation felt too brief to
+trust it had registered — logic unchanged, purely a duration tweak after
+explicitly deciding *against* making the login screen show a persistent
+per-user greeting (would violate the kiosk's neutral-between-employees
+principle established earlier).
+
+## Session 2026-09-02 — CheckView redirect feel + horizontal buttons
+
+That 3.5s bump landed wrong on `CheckView.vue` specifically — felt like
+lag on the way *out* rather than confidence. Fixed by separating the two
+concerns:
+- The Pause starten/beenden button itself now flips its own icon (→
+  `Check`) and label (→ "Pause gestartet"/"Pause beendet") the instant
+  it's clicked and gets disabled, so confirmation is visible right at the
+  point of contact, not only in the status card across the panel.
+- `REDIRECT_DELAY_MS` back down to 2000ms (from 3500) — the status card
+  still gets read, but the screen doesn't linger.
+- `.check-actions` switched from a vertical stack to a horizontal row
+  (`flex-direction: row`, `gap: 32px`) — user wanted the buttons side by
+  side, not stacked. Added `white-space: nowrap` to `.btn-gold`/
+  `.btn-green` so labels stay on one line (were wrapping to two).
+- Added a shared `:disabled` style for both button classes
+  (opacity .65, `pointer-events: none`) — needed once buttons can be
+  disabled after their first tap.
+- Verified live: click Pause starten → button shows check+"Pause
+  gestartet" within ~50ms, status card shows the ticket's exact toast
+  text simultaneously, redirects to Login after ~2s. Buttons confirmed
+  laid out horizontally with single-line labels.
+
+## Session 2026-09-02 — Redirect timing tune-up, card layout as a toggle
+
+Two more requests right after the above:
+- `REDIRECT_DELAY_MS` in `CheckView.vue`: 2000 → 4500. The 2s value was
+  right for "don't make the button feel unresponsive" but wrong once the
+  button itself already gives instant feedback — 2s wasn't enough time
+  to actually read the (now longer) toast sentence. The instant
+  button-level feedback stays; only the overall wait before navigating
+  away got longer again.
+- `.strip-divider` color: `--pep-line` (gray) → `--pep-primary-blue`.
+
+Bigger one: the "device-frame" card layout the user rejected outright
+earlier is back — but explicitly as a **toggle**, not a replacement, per
+the user's "let's try it as an option/idea" framing this time. Added:
+- `src/composables/useLayoutMode.ts` — shared `'full' | 'card'` ref, one
+  toggle affects every view since they all render through `KioskShell`.
+- `KioskShell.vue` now wraps everything in a `.kiosk-stage` and renders a
+  small fixed corner button (`Minimize2`/`Maximize2` from `@lucide/vue`)
+  that flips the mode.
+- Card mode CSS (`main.css`): light gray page background (`#f2f3f5`), the
+  kiosk becomes a fixed-size card (`min(760px, 92vw)` × `min(460px,
+  85vh)`) with its own uniform `border-radius` and drop shadow — the
+  panel's individual corner radius/separation-shadow filter (needed for
+  full-bleed mode) are reset to nothing since the outer card handles all
+  four corners now. Ratio shifts 75/25 → 62/38 (75/25 read too narrow on
+  the white side at this much smaller absolute size). Buttons and the PIN
+  input stretch to the column's full width instead of staying
+  content-sized, and `.check-actions` switches back to a vertical stack
+  in this mode specifically (stays horizontal in full-bleed mode).
+- Verified live on both Login and Menu: toggle switches cleanly, card
+  mode matches the user's reference mock closely (gray backdrop, floating
+  rounded card, full-width stacked buttons), full-bleed mode is
+  byte-for-byte unchanged when the toggle is off. Type-check and build
+  clean.
+
+## Session 2026-09-02/03 — Panel-slide transition finalized, ripple + press-flash for full mode
+
+Long, mostly live-tuned session. Full detail (final CSS structure,
+reasoning for each technique) is in `docs/design.md`'s Motion section —
+this entry is the narrative of how it got there and what to remember.
+
+**Small fixes first:**
+- `.credits` was only on `LoginView.vue` (added when it got pulled out of
+  the now-persistent `KioskShell.vue`) — added to `CheckView.vue` and
+  `CheckoutView.vue` too. Also gave `.panel-view` `position: relative` —
+  without it, `.credits` (`position: absolute`) anchored to the static
+  `.panel-content` wrapper instead of the sliding view, so it didn't
+  travel with the panel during the slide.
+- `useStatusCard` gained a `tone: 'default' | 'positive'` option —
+  the "Willkommen zurück" (returning from pause) message now shows on a
+  green card (`.strip-card--positive`, reuses `--pep-green`) instead of
+  the generic active blue.
+
+**Panel-slide transition — the big one.** Went through: a symmetric
+same-edge drawer for both layout modes → user found full-bleed mode's
+version physically unpleasant no matter the direction (left, right,
+bottom-up, and a full-panel crossfade were all tried and rejected) →
+settled on treating card mode and full-bleed mode as two separate motion
+languages instead of forcing one animation to work for both:
+- **Card mode** kept the drawer, refined into a decaying two-hit bounce
+  on entry (hits the white strip, recoils, hits again smaller, settles).
+  Key lesson from tuning this: alternating `--ease-out`/`--ease-in` per
+  bounce leg is required — using the same `--ease-in-out` on both sides
+  of a peak creates a dead zone right at the peak (velocity hits zero
+  from both directions at once), which read as an artificial pause
+  rather than a continuous bounce.
+- **Full-bleed mode** ended up with *no panel motion at all* — this was
+  a real, repeatedly-confirmed finding, not a compromise: a full-viewport
+  color mass moving in any direction reads as the floor moving rather
+  than an object changing place, because (unlike card mode) it has no
+  visible edges against a backdrop to read as an object.
+
+**Replacement for full-bleed mode: click-triggered effects, not panel
+motion.** Currently wired on `LoginView.vue`'s "Anmelden" button only.
+- `.ripple-ring`: a single soft glow spawned at the tap point, reusing
+  the panel's own gradient colors (light→dark, matching
+  `--pep-panel-gradient`) so it reads as "the blue redistributing," not a
+  foreign color. Went through a filled white disc (read as a flash) and
+  three white hairline rings (read as objects flying apart) before
+  landing here. Real bug found and fixed along the way: `z-index: -1`
+  alone doesn't scope to the intended parent — without `isolation:
+  isolate` on `.panel-view`, the negative z-index escaped up to `.panel`
+  (stacking context from its own `filter`) and rendered the glow *behind
+  the panel's background*, fully invisible, for a while with no visible
+  symptom other than "nothing shows up."
+- `.panel-complete-flash`: a dark inset "pressed" shadow along the
+  panel's edges, firing partway through the glow's own duration (tuned
+  by feel, currently 17% of a 4s glow) rather than at its literal end —
+  the glow visually reads as "arrived" well before its animation
+  technically finishes, so anchoring the flash to the real duration left
+  a multi-second dead gap.
+- **Tooling note for future sessions:** browser-automation screenshots
+  were unreliable for verifying any of this — confirmed independently on
+  two different bugs (an `animationend` listener never firing despite
+  the Web Animations API reporting `playState: "finished"`, and a solid
+  opaque test color not appearing in a captured screenshot despite
+  `getComputedStyle` confirming correct size/position/background).
+  `getComputedStyle` and the Web Animations API were reliable for
+  structural checks the whole session; only visual screenshots were not.
+  Don't re-attempt screenshot-based visual verification for this kind of
+  fine animation tuning — rely on the user's own live browser.
+
+**Not done yet, explicitly deferred to next session:** the ripple/flash
+treatment only exists on the Login screen's button. Menu (CheckView) and
+Checkout still have plain instant buttons in full-bleed mode. Also on
+the list: how the buttons/PIN input themselves should disappear during a
+transition (separate from the panel-level effect).
+
+## Session 2026-09-03 — Full-bleed content crossfade, gold "pause started" tone
+
+Picked up exactly where last session left off: "how do the buttons/PIN
+input themselves disappear during a transition."
+
+**Full-bleed route transition is no longer an instant swap.** Previously
+`.kiosk:not(.kiosk--card)` forced `opacity: 1` / `transform: none` at all
+times specifically to avoid the "floor moving" problem documented above.
+Root cause of that old problem, found this session: `.panel` (the
+persistent wrapper in `KioskShell.vue`) had no background of its own — it
+only ever showed color because the routed `.panel-view` child painted the
+gradient. So any earlier attempt to fade `.panel-view`'s opacity
+necessarily flashed whatever's behind it (the page's default background)
+partway through.
+
+Fix: gave `.panel` the same `--pep-panel-gradient` as a permanent
+backdrop. Two identical gradients blended at any opacity are
+indistinguishable from either alone, so now fading the routed
+`.panel-view` between 1 and 0 leaves the background reading as
+perfectly static — only the content sitting on top of it (which has no
+such backdrop double) visibly crossfades. This is a content-level fade,
+not a reintroduction of panel-level motion — the earlier finding (don't
+slide/bounce/crossfade the whole full-bleed panel) still stands and
+isn't being revisited.
+
+Implementation is a one-line change in scope: full mode's
+`panel-slide-enter-from`/`leave-to` now sets `opacity: 0` instead of `1`,
+and `enter-active`/`leave-active` get a real `opacity 220ms` transition
+instead of `none`. Card mode's bounce is untouched.
+
+**Verification note:** this project's browser-automation tab throttles
+CSS transitions/rAF when occluded (same root cause as last session's
+`animationend` findings, just a new symptom) — mid-test the DOM would
+appear "stuck" mid-fade for several seconds with `transitionend` never
+firing, purely because the tab wasn't actually painting, not because the
+transition was broken. Forcing a screenshot (which requires a real paint)
+each time unstuck it immediately and the sequence always completed
+correctly. Don't read a stuck-looking class list as a bug in this
+environment without first forcing a paint via screenshot.
+
+**Gold tone for "Pause gestartet".** User noticed the status card flips
+to generic active blue when starting a pause, inconsistent with the
+green `--positive` tone already used for *returning* from a pause.
+Added a third `tone: 'pause'` option to `useStatusCard` (`'default' |
+'positive' | 'pause'`), a `.strip-card--pause` class using the
+previously-unused `--pep-gold-bg-soft` token, and wired it into
+`CheckView.vue`'s `onPauseStarten`. Same dark-ink-text override pattern
+as `--positive` (the active-state white-text rule would otherwise win).
+
+**Not done yet:** the ripple/flash click effect still only exists on
+Login's "Anmelden" button, not CheckView/CheckoutView's buttons.
+
+**Follow-up in the same session: route change now waits for the ripple.**
+The content crossfade above meant the leave-fade started covering the
+button almost the instant it was clicked — the ripple barely had time to
+grow before the screen was already changing. Fix: `onSubmit` in
+`LoginView.vue` now awaits `RIPPLE_VISUALLY_DONE_MS` (the same constant
+that times `.panel-complete-flash`) before calling `router.push`, full
+mode only — card mode has no ripple and navigates immediately as before.
+Tried tuning the ratio down from 0.17 to 0.15 in-session; user reverted
+it back to 0.17 afterward since that value is tied to the flash timing —
+left as 0.17. Verified by timing the actual route change from click (not
+by eyeballing a screenshot): landed close to the expected 4000 × ratio.
+
+**Regression found and fixed: card mode's drawer exit was revealing blue,
+not neutral space.** Side effect of the `.panel` backdrop gradient added
+above for the full-bleed crossfade — `.panel` is a shared class, so card
+mode's slide-out (`.panel-view` translating off to the side) started
+revealing that same saturated gradient underneath instead of neutral
+page space. Fixed by overriding `.kiosk--card .panel` to a flat
+`--pep-primary-blue-soft` (`#e5f2fa`) background instead of the gradient
+— card mode's reveal now reads as pale empty space, full-bleed mode is
+untouched (different selector scope). User caught this by eye; confirmed
+via `getComputedStyle` (`.panel`'s `background-color` is exactly
+`rgb(229, 242, 250)` in card mode) since screenshotting the exact
+mid-slide frame in this automation environment is unreliable, per the
+running note on this project.
+
+**Tooling note:** the user keeps a long-running dev server at
+`http://localhost:3001/chronology` — reuse that for any live/browser
+verification instead of starting a second `npm run dev`.
+
+**Ripple/flash extracted into `useRippleEffect` and wired onto CheckView's
+buttons.** This was the explicitly-deferred item from last session
+("Menu/CheckView and Checkout buttons don't have the ripple/flash
+treatment yet"). Since the effect was about to be used on 2+ screens
+(and Checkout is next), pulled `spawnRipple` out of `LoginView.vue` into
+`src/composables/useRippleEffect.ts` verbatim — same glow/flash/cleanup
+logic, same tuning constants (`RIPPLE_VISUALLY_DONE_MS` now exported so
+callers can reuse it for the route-delay pattern below too). `CheckView.vue`
+now spawns the ripple from all three of its buttons (Pause starten, Pause
+beenden, Zum Checkout) via a small inline `(e) => { spawnRipple(e);
+onX() }` handler per button, and `onZumCheckout` gets the same
+`RIPPLE_VISUALLY_DONE_MS` route-delay `onSubmit` already had in
+`LoginView.vue` (full mode only). `onPauseStarten`/`onPauseBeenden` didn't
+need that delay — their own `REDIRECT_DELAY_MS` (2500ms) already far
+outlasts the ripple. Verified live: clicking "Zum Checkout" spawns the
+glow from the actual click point and the panel-edge flash, then
+navigates to Checkout after the same short hold. Checkout's own buttons
+(none exist yet, M4 placeholder screen) are the next candidate once they
+exist.
+
+## Session 2026-09-03 — Milestone 4: Checkout screen built
+
+Built out `CheckoutView.vue`, previously an M4 placeholder. Source of
+truth: the original Redmine ticket screenshots in Downloads
+(`4.Checkout_Übersicht.png` and siblings — same ticket, different
+attachment lightboxes open), not a literal "Notes" folder (none exists in
+this repo or elsewhere searched) — cross-checked against
+`docs/roadmap.md` (Milestone 4 checklist) and `docs/specs/phase-1.md`
+(screens #7/#8), which already matched the ticket.
+
+**What the ticket actually asked for**, reading the hand-drawn annotations
+on the mockup: a Plan-vs-Stempel table (Checkin/Checkout/Pause/Summe,
+Summe bold), a "Notiz" field with an info-icon explanation (replacing an
+earlier placeholder about Über-/Unterstunden that's crossed out in the
+annotation), a green "Checkout" button (renamed from the mockup's red
+"Auschecken"), and — per `docs/CONTEXT.md`'s glossary and
+`docs/architecture/state-machine.md`'s already-documented flow — a
+confirm dialog before the actual checkout fires, since it's the one
+irreversible action in the app.
+
+**Table values:** Plan column reads straight from `MockUser.plan`.
+Stempel column reads `DayState` — Checkout shows "–" until actually
+checked out (this screen is reached *before* that happens), Summe
+(Stempel) is live elapsed time so far (`now - checkinAt - pauseSeconds`)
+rather than a final total, since checkout hasn't happened yet when this
+screen first renders. Pause is always a finalized total by the time a
+user can reach this screen — CheckView only offers "Zum Checkout" outside
+an active pause, so there's no "currently mid-pause" case to account for
+here.
+
+**Confirm dialog** is a plain `v-if` overlay scoped to `.panel-view`
+(not a page-wide Teleport) — dims just the blue panel, not the white
+status strip, which stays a neutral kiosk surface. No dedicated dialog
+component; it's the only modal in the app so far, doesn't justify one
+yet. Added `.btn-outline` (white/bordered) for "Nein" — first non-gold,
+non-green button variant, since a decline should carry equal visual
+weight to "Ja" (`.btn-green`), not read as a muted afterthought.
+
+**Ripple/flash wired onto the Checkout button too**, reusing
+`useRippleEffect` — same `RIPPLE_VISUALLY_DONE_MS` delay before the
+confirm dialog opens (so the ripple has a moment to land before the
+dialog covers the screen), matching the pattern already established for
+route changes. The dialog's own Ja/Nein buttons don't get the ripple —
+they're modal actions, not full-bleed panel-level presses, and the glow
+would render behind the dialog's opaque backdrop anyway (z-index: -1).
+
+**`useToastRedirect` extracted**, per `toast-system.md`'s own note to
+revisit once a third view needed "show status card, then leave" —
+Checkout was that third view. `CheckView.vue`'s two call sites
+(`onPauseStarten`/`onPauseBeenden`) were refactored to use it too, so the
+pattern isn't duplicated a third time; `LoginView.vue`'s checkin case
+deliberately still doesn't use it, since it reverts the card in place
+rather than navigating away, a genuinely different pattern.
+
+**Verified live** end-to-end on the user's own running dev server
+(`localhost:3001`, not a server I started): checkin → menu → Zum
+Checkout → table renders correct Plan/Stempel values → Notiz field →
+Checkout button spawns the ripple → confirm dialog → "Ja" → toast →
+redirect to `/chronology`. Confirmed in both full-bleed and card mode.
+
+**Follow-up, same day: two things the first pass got wrong.** User pasted
+the actual (unobscured) ticket text, which the screenshots' lightbox had
+partially cut off:
+1. The Notiz hint text wasn't a placeholder guess after all — the ticket
+   spells it out exactly: "Bitte Gründe für Über- und Unterstunden oder
+   Änderungswünsche von Zeiteinträgen angeben." Swapped in verbatim; the
+   open question logged in `docs/CONTEXT.md` about what this field is for
+   is resolved, removed it.
+2. The hint was wired via the native `title` attribute, reasoned as "only
+   one tooltip in the app, doesn't justify tooltip infrastructure" — but
+   the ticket explicitly asks for a visible hover window
+   ("wenn man da drauf hovert, dann [Text]"), and `title` is slow,
+   inconsistent, and unstyled, which doesn't read as intentional. Replaced
+   with a real CSS hover/focus-visible bubble (`.info-tooltip`,
+   `.info-tooltip-bubble` in `main.css`) — dark box, small arrow, appears
+   on both mouse hover and keyboard focus (`tabindex="0"` on the wrapper).
+   Couldn't get the automation's synthetic hover to hold `:hover` across
+   separate tool calls to actually screenshot it lit up (same category of
+   flakiness as the animation/`animationend` findings from prior
+   sessions) — verified the DOM text and CSS are correct by hand instead;
+   left it for the user to eyeball hovering live.
+
+**Second follow-up, same day: four issues from live use.**
+1. **Route delay felt too long/unclear.** `ROUTE_DELAY_MS` split out of
+   `useRippleEffect.ts` as its own constant (`RIPPLE_VISUALLY_DONE_MS *
+   0.8`) rather than lowering the shared ratio again — the flash timing
+   stays exactly where the user set it (0.17), only the "how long to
+   hold before the next screen/dialog" delay dropped ~20%. Used in
+   `LoginView`, `CheckView`, `CheckoutView` wherever a route change or the
+   confirm dialog was being held for the ripple.
+2. **Checkout's ripple reading as "more visible than before, sitting
+   above the button."** Root cause: on Login/Check a click always leads
+   to navigating away, which unmounts the ripple well before its 4s
+   animation finishes. Checkout's "Checkout" button instead opens a
+   dialog ON TOP of the same view — the dialog's backdrop is only 45%
+   opaque, so the glow kept animating and showing through it for the
+   remaining ~3s. Added `clearRipple()` to `useRippleEffect` (removes any
+   `.ripple-ring`/`.panel-complete-flash` still in the DOM), called right
+   before the confirm dialog opens.
+3. **No delay wanted after "Ja."** `onConfirmJa` no longer goes through
+   `useToastRedirect` — straight `checkout()` → `router.push('/chronology')`.
+   Also matches a fact that was already true and unnoticed: `LoginView`
+   resets the status card to idle unconditionally on mount, so a toast
+   message set here would have been overwritten within moments anyway.
+4. **Notiz info icon too small to hit on an iPad.** Moved the hover/focus
+   trigger (`.info-tooltip`) from just the 14px icon onto a wrapper
+   around the whole "Notiz" word + icon, with padding + matching negative
+   margin so the hit area is bigger without shifting the visible layout.
+
+**Table redesign, round 2.** User referenced a glassmorphic iPad
+lock-screen mockup as a "make it more interesting" direction. Kept round
+1's table CSS in `main.css`, commented out rather than deleted, in case
+this round doesn't stick either. New version (`.checkout-summary`,
+`.checkout-row*`) drops the literal `<table>` for a frosted-glass summary
+list: circular icon badges, explicit row labels (Checkin/Checkout/Pause/
+Summe) instead of relying on icon recognition, each row's real Stempel
+value large/bold with its Plan value small and muted underneath instead
+of two equal-weight table columns. `backdrop-filter: blur(16px)` for the
+glass effect. One click during testing hit a `CDP dispatchMouseEvent`
+timeout ("renderer may be frozen or unresponsive") right after this
+landed — a JS-dispatched click immediately after worked fine and
+subsequent screenshots rendered normally, so it read as automation flake
+rather than a real perf issue, but worth a second look if blur-related
+jank ever shows up on the actual iPad hardware.
+
+Verified live on the user's own dev server: table renders with the new
+list layout, Checkout → ripple → dialog appears with no lingering glow →
+"Ja" → back on `/chronology` in well under a second (vs. the old 2.5s).
+
+**Third follow-up, same day.**
+1. **"Notiz" label sitting flush on the input, no gap.** Self-inflicted by
+   the previous fix's bigger tap target: `.info-tooltip`'s `margin: -8px
+   -10px` shorthand set ALL FOUR margins on the same element `.notiz-label`
+   is also applied to — since it's defined later in the cascade, it fully
+   overwrote `.notiz-label`'s `margin-bottom: 8px` down to -8px instead of
+   just leaving it alone. Changed to `margin-left`/`margin-right` only, so
+   the vertical spacing from `.notiz-label` survives untouched.
+2. **Checkout's "Ja" reverted back to `showToastThenRedirect`.** Went
+   instant-redirect for one round reasoning the message would barely be
+   visible before LoginView's mount resets it — turned out the user
+   specifically wants that window, same as Pause's toasts: it's the only
+   place the actual checkout time is shown. `useToastRedirect` re-added,
+   `useRouter`'s direct import removed again (not needed once the
+   composable owns navigation).
+3. **Checkout table reverted to round 1 (the plain table), TEMPORARILY,
+   for a side-by-side compare** — the user never got a screenshot of it
+   before round 2 (the glass-card list) replaced it. Both `main.css` and
+   `CheckoutView.vue`'s template now have round 2 preserved as comments
+   right next to round 1 (currently live) — whichever the user doesn't
+   pick, delete the commented copy; until then both stay.
+
+Verified live again: Notiz now has visible breathing room above the
+input, the confirm dialog's "Ja" shows "Auf Wiedersehen Anna, du bist
+jetzt ausgecheckt, 15:10" for the full ~2.5s before redirecting, and the
+round 1 table renders correctly for the comparison.
+
+**Fourth follow-up, same day: decision made, one more small timing tweak.**
+User compared both table rounds live and picked round 2 (the frosted-glass
+list) — swapped it back to active in both `main.css` and
+`CheckoutView.vue`, round 1 back to commented-out. Plans to revisit the
+icons/time formatting on round 2 further later. Also trimmed
+`ROUTE_DELAY_MS` again, this time explicitly *not* touching the 0.17
+ripple/flash ratio: `RIPPLE_VISUALLY_DONE_MS * 0.8` → `* 0.7` (~12.5%
+off, within the requested 10–15%) — still its own constant, still leaves
+the flash exactly where the user tuned it.
+
+**Fifth follow-up, same day: small polish + one reversal.**
+- Summe row icon swapped `Sigma` → `Clock` (plain, less math-y).
+- Summe's Stempel value now turns green (`#b7e4a0`, `.summe-value.reached`)
+  once actual worked time reaches the planned total — a one-line
+  `computed(() => stempelSummeMinutes.value >= planSummeMinutes)`, no new
+  architecture. To test it live: this screen computes Summe once on mount
+  (not a live-ticking clock — `Date.now()` inside a `computed()` with no
+  reactive dependency that changes, so it never re-evaluates on its own),
+  so waiting on the page does nothing; temporarily shrinking a user's
+  `plan` in `src/mocks/users.ts` (e.g. matching checkin/checkout, 0 pause)
+  makes the target ~0 minutes so it's already "reached" the moment the
+  page loads. Demoed on Thomas, reverted his plan back to 09:00–17:00/
+  00:30 afterward.
+- **Reverted the ripple/flash off the Checkout button entirely** (removed
+  `useRippleEffect`/`useLayoutMode`/`panelViewRef` from `CheckoutView.vue`
+  — nothing else there needed them). User found it looked bad specifically
+  there: the button sits low on the screen, and unlike Login/Check (where
+  navigating away unmounts the ripple gradually via the content
+  crossfade), this button's ripple had to be hard-removed
+  (`clearRipple()`) right as the confirm dialog opened, with no fade to
+  soften the cutoff. Landed on a principled reason it's fine for this one
+  button to be the exception: the confirm dialog is already immediate,
+  obvious feedback on click — the ripple's whole job elsewhere is
+  covering screens that would otherwise change with zero visual
+  acknowledgment, which isn't the case here. `onCheckoutClick` is back to
+  a plain synchronous handler, dialog opens instantly, no more
+  `ROUTE_DELAY_MS` wait on this specific button.
+- **Card mode's entrance bounce gained a third, smaller hit.** Was two
+  recoils (-5%, -2%); added a third (-0.8%, ~0.4× the last, continuing
+  the existing decay ratio) with the same alternating `--ease-out`
+  (leaving an impact) / `--ease-in` (falling into the next one) per leg,
+  and each cycle proportionally faster than the last — a real bounce's
+  period shrinks along with its height, not just its size. Verified via
+  the CSSOM (`document.styleSheets` → the `@keyframes panel-enter-bounce`
+  rule's 8 stops) rather than trying to screenshot the animation, per the
+  standing note that this channel can't reliably judge motion — feel is
+  the user's call from their own browser.
+
+**Sixth follow-up, same day: real bug in the bounce, found by feel.** User
+tweaked the numbers themselves (46%→1% overshoot, -4%/-1.8%/-0.6% recoils)
+but kept sensing "mini brakes" — the panel visibly slowing down right
+before the first hit, not slamming into it. Root cause: the 0% keyframe
+never set its own `animation-timing-function`, so the very first leg
+(0%→46%, the approach into the first impact) silently inherited
+`--ease-out` from the `animation` shorthand — the curve meant for
+*leaving* an impact (decelerating away from it), applied backwards to an
+*approach*. Every other approach-into-a-hit leg (68%, 88%) already used
+`--ease-in` correctly; this one just got missed when the bounce was
+first authored, before there was a third hit to make the pattern obvious
+by comparison. Fixed by setting `--ease-in` explicitly on 0%. Verified
+the same way — read back via CSSOM, not a screenshot.
+
+**Seventh follow-up, same day: the real culprit was the curve shape, not
+direction.** The ease-in fix above didn't fix the feel — user still felt
+a "mini pause" right at each hit before the recoil started. Actual cause:
+the site's `--ease-out`/`--ease-in` tokens are both deliberately "strong"
+curves whose two control points share the same y (1,1 for ease-out, 0,0
+for ease-in) — nearly all the value change happens in a small fraction
+of the segment, then the curve sits almost flat for the rest. That's
+fine for one big movement (what they're tuned for elsewhere in the app —
+buttons, the panel-slide crossfade), but this bounce's legs are short
+and small (1-4% of travel), so the flat tail became visible as an actual
+pause at every hit before "resuming" into the next leg. Added two
+animation-local tokens instead — `--ease-bounce-out` (`cubic-bezier(0.25,
+0.46, 0.45, 0.94)`) / `--ease-bounce-in` (`cubic-bezier(0.55, 0.06, 0.68,
+0.19)`), standard smooth easeOutQuad/easeInQuad-style curves without the
+flat plateau — and swapped every leg of `@keyframes panel-enter-bounce`
+onto them, not touching the global `--ease-out`/`--ease-in` used
+elsewhere. Also dropped the now-dead `var(--ease-out)` off
+`.panel-slide-enter-active`'s `animation` shorthand, since every keyframe
+sets its own timing function explicitly now — a default there was never
+going to apply to anything, just noise for the next reader.
+
+Mid-edit, caught the two new custom properties missing from `:root` even
+though the keyframes already referenced them (`getComputedStyle`
+returned empty strings for both) — re-added them and re-verified via
+CSSOM that both resolve correctly now.
+
+**Eighth follow-up, same day: confirm dialog removed, ripple redesigned
+for one button.** Two changes, same conversation:
+1. Removed Checkout's confirm dialog entirely (`showConfirm`,
+   `onConfirmJa`/`onConfirmNein`, `.confirm-overlay`/`.confirm-dialog`/
+   `.confirm-text`/`.confirm-actions`, and `.btn-outline` — that variant
+   existed only for the dialog's "Nein", nothing else used it, deleted
+   rather than commented since this is a real decision, not a
+   round-1-vs-round-2 comparison). "Checkout" now calls `checkout()` and
+   `showToastThenRedirect` directly, same 2.5s hold as before. Turned out
+   redundant once built — the toast is already the "did this register?"
+   feedback the dialog was also trying to provide.
+2. That left the button with *no* click feedback at all (ripple was
+   already off it from an earlier round, dialog now gone too) — visibly
+   missing something. Ripple-anchored-to-the-click-point was already
+   tried and rejected on this specific button (sits low on screen, read
+   badly). Landed on a variant instead: `useRippleEffect` gained
+   `spawnRippleAt(x, y)` as the shared internal implementation, with
+   `spawnRipple(event)` (existing, click-point-anchored) and a new
+   `spawnRippleFromCorner()` (anchors at the panel's own top-left corner,
+   `(0, 0)`) both built on top of it. Notably, this reproduces an effect
+   the user had already seen and liked by accident: pressing Enter to
+   submit `LoginView`'s PIN form fires a browser-synthesized click on the
+   submit button whose `clientX`/`clientY` default to 0 — which lands
+   almost exactly at the panel's top-left corner, so the glow already
+   grew diagonally from there instead of from the button. Wired
+   `spawnRippleFromCorner()` onto Checkout's button specifically.
+   `clearRipple()` (only needed for hiding the ripple under the now-gone
+   dialog) removed as dead code.
+
+Verified live: Checkout → glow visibly grows from the panel's top-left
+corner diagonally toward the button → button flips to "Ausgecheckt"
+immediately, no dialog → toast → redirect, same as before.

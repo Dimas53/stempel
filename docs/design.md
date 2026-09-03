@@ -160,6 +160,17 @@ see comparison below):
   `border-bottom-right-radius: var(--pep-frame-radius)`) — are rounded.
   The outer edges sit flush against the real viewport since there's
   nothing to round them against.
+- 🟡 **Revisited as a toggle, not a replacement.** Same idea as above
+  (fixed-size rounded card on a neutral gray page) came back later, this
+  time explicitly framed as "let's try it as an option" rather than the
+  only look — so it's implemented as a live toggle
+  (`useLayoutMode.ts` + a corner button in `KioskShell.vue`), full-bleed
+  stays the default and is completely unaffected when the toggle is off.
+  Card mode: `#f2f3f5` page background, card sized
+  `min(760px, 92vw) × min(460px, 85vh)`, ratio 62/38 (not 75/25 — too
+  narrow on the white side at this smaller absolute size), buttons/PIN
+  input stretch full-width instead of staying content-sized. Not a
+  decision yet — a live A/B to react to.
 - **Footer credit line**: moved from the white strip to the **blue
   panel**, centered horizontally, near the bottom, **white text**
   (`rgba(255,255,255,.8)`) — `© pepito 2026 · mit ♥ gemacht von Ducito &
@@ -207,33 +218,141 @@ see comparison below):
 
 ## Motion
 
-🟡 Draft, not yet prototyped. Described interaction for the PIN screen:
-on a **correct** PIN submit, the form doesn't hard-swap — it slides left,
-revealing the next screen state sliding in from the right (horizontal
-step transition, similar to a wizard). Applies at minimum to
-1 → 2 (Willkommen) / 1 → 3 (menu) / 1 → 5 (Pause beenden). Needs a real
-prototype pass before locking timing/easing — flag for the `animate`
-skill once components exist.
+The white-strip message card gets a state-indication treatment on every
+status change: flips to full `--pep-primary-blue` by default, `--pep-green`
+for good-news messages like returning from a pause, or the pale
+`--pep-gold-bg-soft` for going *into* a pause (`useStatusCard`'s `tone:
+'default' | 'positive' | 'pause'` option) — with a `scale(1.04)` pop, and
+the text itself crossfades via `<Transition mode="out-in">`. Gated under
+`prefers-reduced-motion`. See `KioskShell.vue` (`.strip-card`,
+`.strip-msg-*`).
 
-**Status: not implemented yet.** Right now `router.push()` does a hard,
-instant swap — no animation at all. This is a separate step to build once
-the Menu/Pause/Checkout screens exist to slide *between*.
+### Route transitions — `<Transition name="panel-slide" mode="out-in">` in `App.vue`
 
-🟡 **Explicitly deferred (not a bug):** user asked for this panel-slide to
-be built now, tied to the checkin message. Declined for now, on purpose —
-there's no real second screen for it to reveal yet (checkin loops back to
-the same `/chronology` route), so a slide-out-and-back-to-nothing would
-be motion without spatial purpose. Build it for real once M3 (Menu
-screen) exists — that's the first transition with genuinely different
-content on each side.
+The blue panel's own route transition went through many rejected shapes
+before landing on **two different treatments for the two layout modes**
+(`useLayoutMode`) — full-bleed and card mode don't share one animation
+language, and forcing them to converge on a single motion made both
+worse. All of this lives in `main.css`'s "Panel transition" section.
 
-**What shipped instead** (via the `animate` skill): the white-strip
-message card now gets a proper state-indication treatment on checkin —
-flips to full `--pep-primary-blue` with white text and a `scale(1.04)`
-pop, and the text itself slides up-and-out / in-from-below on each swap
-(Vue `<Transition mode="out-in">`, `--ease-out` token, 200ms). Gated
-under `prefers-reduced-motion`. See `LoginView.vue` (`.strip-card`,
-`.strip-msg-*` transition classes).
+**Card mode** (`.kiosk--card`): a same-edge drawer. The blue block
+(background *and* content together — `.panel-view` carries the gradient
+that's actually seen) exits left and stays gone (`.panel-slide-leave-active`,
+plain `transition`, `--ease-drawer`). `.panel` itself is overridden to a
+flat `--pep-primary-blue-soft` in card mode specifically so that what's
+revealed *behind* the sliding `.panel-view` mid-exit reads as neutral
+empty space, not a second copy of the saturated gradient (see the
+full-bleed note below for why `.panel` has a background at all now — it
+didn't used to). The
+entrance is where the personality is: the incoming panel travels right,
+"hits" the white strip, and does a decaying three-hit bounce — recoils
+left, hits again smaller, recoils again even smaller, settles
+(`@keyframes panel-enter-bounce`). Each recoil is roughly 0.4× the last
+(-5% → -2% → -0.8%) and each cycle is proportionally faster too, not
+just smaller — a real bounce's period shrinks along with its height.
+Notes for anyone tuning this further:
+- Each hit/recoil leg needs **alternating** `--ease-out` (leaving an
+  impact) / `--ease-in` (falling into the next one) on the keyframe
+  stops, not a uniform `--ease-in-out` — the same curve on both sides of
+  a peak zeroes the velocity from both directions at once, which read as
+  an artificial "hold" rather than a continuous bounce. This includes the
+  very first leg (0% → the first hit) — it's a fall into an impact too,
+  same as every approach-to-a-hit leg after it, so it needs `--ease-in`
+  set explicitly. Missing this on 0% specifically (it silently inherited
+  `--ease-out` from the `animation` shorthand instead) is a real bug that
+  shipped for a while — read as the panel "braking" right before the
+  first hit instead of slamming into it.
+- This works in card mode specifically because the blue block has
+  visible edges against the gray page backdrop, so it reads as an
+  *object* changing place. It does not work in full-bleed mode (below) —
+  a full-viewport color mass doesn't have edges to read as an object, so
+  the same motion (in *any* direction: left, right, up, down, or even a
+  full-panel crossfade — all tried) reads as the floor moving, not
+  something changing place. Don't reintroduce panel-level motion in full
+  mode; the finding was consistent across every direction tried.
+
+**Full-bleed mode**: the panel's background/position stays fully static —
+that finding (no slide, no bounce, no whole-panel crossfade; every
+direction was tried and rejected as "the floor moving") still stands.
+What changed: `.panel` (the persistent wrapper in `KioskShell.vue`) now
+carries the same `--pep-panel-gradient` as a permanent backdrop, so the
+routed `.panel-view`'s own opacity can fade between routes
+(`.kiosk:not(.kiosk--card) .panel-slide-enter/leave-active`, `opacity
+220ms`) without ever revealing anything behind it — two identical
+gradients blended at any opacity are indistinguishable from either alone.
+The visible result is a **content crossfade**: the form/buttons/credits
+sitting on top of the gradient fade out then in, while the background
+itself reads as perfectly static throughout. This is the "how do the
+buttons/PIN input themselves disappear during a transition" item flagged
+below as deferred — now done, and deliberately scoped to content only,
+not a reopening of the panel-level-motion question.
+
+The only *other* motion tied to this screen is two effects fired from
+the button click itself, shared across screens via `useRippleEffect.ts`
+(`RIPPLE_VISUALLY_DONE_MS`) — wired on `LoginView.vue`'s "Anmelden" and
+all three of `CheckView.vue`'s buttons (Pause starten/beenden, Zum
+Checkout) via `spawnRipple(event)`, anchored at the click point. Tried
+that same click-anchored version on `CheckoutView.vue`'s "Checkout" too
+(this screen used to also have a confirm dialog; the dialog's translucent
+backdrop meant the ripple had to be hard-removed right as it opened, no
+fade to soften it) — but rejected on its own merits once the dialog was
+gone too: this button sits low on the screen, and a glow centered there
+just read badly. Landed on `spawnRippleFromCorner()` instead — same
+effect, anchored at the panel's own top-left corner rather than the tap
+point, growing diagonally toward the button. This isn't an arbitrary
+choice: it reproduces something the user had already seen and liked by
+accident — pressing Enter to submit `LoginView`'s PIN form fires a
+browser-synthesized click on the submit button whose `clientX`/`clientY`
+default to `0`, landing almost exactly at the panel's top-left corner.
+  1. **`.ripple-ring`** — a single soft radial glow spawned at the click
+     point (`spawnRipple` in the view), reusing `--pep-panel-gradient`'s
+     own light→dark stops so it reads as "the panel's own blue
+     redistributing" rather than a foreign color laid over it. Grown via
+     `width`/`height` (not `transform: scale`) so its percentage-based
+     gradient stops keep their proportions as it expands — the one place
+     in the app that knowingly breaks the transform/opacity-only rule,
+     for the same reason the accordion-height exception exists (no
+     transform equivalent gives what's needed). `z-index: -1` puts it
+     behind the button/form, which requires `.panel-view` to have
+     `isolation: isolate` — without an explicit stacking context there,
+     the negative z-index escapes up to `.panel` (which gets one for
+     free from its own `filter: drop-shadow`) and ends up rendering
+     *behind the panel's own background*, i.e. fully invisible. Learned
+     this the hard way; if a similar glow gets added elsewhere, check
+     for this first.
+  2. **`.panel-complete-flash`** — a dark inset shadow along the panel's
+     edges (matching `.panel`'s own rounded top-right corner via
+     `border-top-right-radius`), firing partway through the glow's
+     duration rather than at its literal end — the glow's own colors are
+     close enough to the panel's gradient that it reads as "arrived"
+     well before its animation technically finishes, so timing this off
+     the real duration left a long, do-nothing gap before the flash.
+     Reads as a light "press" cue (same idea as `.btn-gold`/`.btn-green`
+     `:active`, just around the whole panel instead of one button).
+     `RIPPLE_VISUALLY_DONE_MS` (currently 15% of the glow's 4s duration —
+     tuned down from 17%) marks this "arrived" moment, and does double
+     duty: `LoginView.vue`'s `onSubmit` also awaits it (full mode only)
+     before calling `router.push`, so the route change — and the content
+     crossfade above that comes with it — doesn't start covering the
+     button/ripple before the ripple has had a moment to read. Without
+     this the content fade began almost the instant the button was
+     clicked, cutting the ripple off while it was still tiny.
+
+Both of these were tuned entirely by feel over many iterations — timing,
+opacity curve shape, gradient stop placement, blur radius, all landed
+through live user feedback, not calculation. **Screenshots taken via
+this project's browser-automation tooling proved unreliable for judging
+any of it** (confirmed independently: `animationend` not firing despite
+`Animation.playState` reporting `"finished"`, a solid opaque test color
+not appearing in a captured screenshot despite `getComputedStyle`
+confirming correct layout/paint properties) — don't burn time trying to
+verify this kind of thing visually through that channel again; rely on
+`getComputedStyle`/Web Animations API for structural checks, and the
+user's own live browser for anything about feel.
+
+CheckoutView is fully built now (M4 done) — its "Checkout" button
+deliberately doesn't get the ripple/flash, see the full-bleed section
+above for why.
 
 ## Components
 
@@ -271,12 +390,27 @@ screen: Pause starten / Zum Checkout) rather than relying on padding alone.
 
 ### Button variants
 
-| Variant | Background | Used on |
-|---|---|---|
-| Primary (blue) | `--pep-primary-blue` / hover `--pep-primary-blue-hover` | "Anmelden" |
-| Gold (pause) | Gold gradient, see above | "Pause starten", "Pause beenden" |
-| Success (green) | `--pep-green` | "Zum Checkout", "Checkout" |
-| Danger (red) | `--pep-red` | Error states (E1–E5) |
+| Variant | CSS class | Background | Used on |
+|---|---|---|---|
+| Gold | `.btn-gold` | Gold gradient, see above | "Anmelden", "Pause starten", "Pause beenden" |
+| Green | `.btn-green` | `--pep-green` / hover `--pep-green-hover` / active `--pep-green-active` | "Zum Checkout", "Checkout" |
+| Danger (red) | — (inline) | `--pep-red` | Error states (E1–E5) |
+
+A fourth variant, `.btn-outline` (white fill, neutral border), briefly
+existed for a checkout confirm dialog's "Nein" — removed along with that
+dialog (see the Motion section's full-bleed notes), so back down to
+three.
+
+Note: the "Primary (blue)" row this table used to have for "Anmelden" was
+never actually correct — Anmelden has been gold since the very first
+schematic mock, matching the ticket's own gold/yellow instruction for
+Pause buttons. There is no plain blue button anywhere in the built UI;
+blue is used only as the panel/background accent, per the original brief
+("blue as an accent, not a fill"). `.btn-green` reuses the exact same
+structural recipe as `.btn-gold` (hover: thin shadow + `scale(0.985)`;
+active: darker/tighter shadow + `scale(0.965)`) with a flat color swap
+instead of the gradient-angle rotation, since there's no second green
+tone to swap toward yet.
 
 ## CSS organization
 

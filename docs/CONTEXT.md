@@ -11,8 +11,7 @@ Ubiquitous language for the time clock terminal prototype.
 | Stamp (Stempel) | Timestamp recorded when an action occurs (checkin, pause start, pause end, checkout) | Checkin, Pause, Checkout |
 | Checkin | Action that starts the work day — first stamp of the day | Stamp, DayState |
 | Pause | Break during the work day — can be started after checkin, must be ended before checkout | Stamp, DayState |
-| Checkout | Action that ends the work day — final stamp, irreversible for the day | Stamp, DayState, Confirm Checkout |
-| Confirm Checkout | Dialog shown before final checkout — warns user that the day is ending and cannot be restarted | Checkout |
+| Checkout | Action that ends the work day — final stamp, irreversible for the day | Stamp, DayState |
 | DayState | Current state of a user for today — tracks checkin/pause/checkout times and accumulated pause seconds | MockUser, Stamp |
 | MockUser | Test user with PIN, name, and planned schedule — used for prototype demonstration | PIN, Plan |
 | Plan | Scheduled times for checkin, checkout, and pause duration — shown in checkout overview | MockUser, Stempel |

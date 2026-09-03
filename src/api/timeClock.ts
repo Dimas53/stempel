@@ -2,7 +2,10 @@ import { mockUsers } from '@/mocks/users'
 import { getDayState, setDayState } from '@/mocks/dayState'
 import { PinError, type SubmitPinResult } from '@/types/timeClock'
 
-const MIN_STAMP_INTERVAL_MS = 60_000
+// TEMP(dev-only, revert before demo/final): ticket requires 60_000 (1 minute)
+// between stamps. Shortened to 5s here purely so manual click-through
+// testing doesn't require actually waiting a full minute between steps.
+const MIN_STAMP_INTERVAL_MS = 5_000
 
 function tooSoon(lastStampAt: string | null, now: number): boolean {
   if (!lastStampAt) return false
@@ -47,12 +50,15 @@ export async function submitPin(pin: string): Promise<SubmitPinResult> {
   return { user, action: 'menu' }
 }
 
-export async function startPause(userId: string): Promise<void> {
+// Returns the timestamp actually stamped, so callers display exactly what
+// was persisted rather than recomputing `new Date()` a second time.
+export async function startPause(userId: string): Promise<string> {
   const now = new Date().toISOString()
   setDayState(userId, { pauseStartAt: now, pauseEndAt: null, lastStampAt: now })
+  return now
 }
 
-export async function endPause(userId: string): Promise<void> {
+export async function endPause(userId: string): Promise<string> {
   const day = getDayState(userId)
   const now = Date.now()
   const nowIso = new Date(now).toISOString()
@@ -64,9 +70,17 @@ export async function endPause(userId: string): Promise<void> {
     pauseSeconds: day.pauseSeconds + Math.max(elapsed, 0) / 1000,
     lastStampAt: nowIso,
   })
+  return nowIso
 }
 
-export async function checkout(userId: string): Promise<void> {
+export async function checkout(userId: string): Promise<string> {
   const now = new Date().toISOString()
   setDayState(userId, { checkoutAt: now, lastStampAt: now })
+  return now
+}
+
+// Read-only accessor for views that need to know the current day state
+// (e.g. CheckView deciding whether to show the menu or "Pause beenden").
+export function getCurrentDayState(userId: string) {
+  return getDayState(userId)
 }

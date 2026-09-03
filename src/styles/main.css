@@ -24,14 +24,16 @@
   /* Trying a plain two-stop diagonal instead of the repeating-stripe
      4-stop version — that one read as a "premium/shiny" banner effect
      the user didn't want. Not confirmed final yet.
-     Static reference only — .btn-anmelden builds its own gradient
-     inline from --pep-gold-gradient-angle directly, since chaining an
-     animated angle through a second custom property broke the
-     transition (see the Login section below). */
+     Static reference only — .btn-gold builds its own gradient inline
+     from --pep-gold-gradient-angle directly, since chaining an animated
+     angle through a second custom property broke the transition (see
+     the Buttons section below). */
   --pep-gold-gradient: linear-gradient(135deg, #f6d27a, #c9922e);
 
   /* Accent — green (checkout) */
   --pep-green: #d2f0c8;
+  --pep-green-hover: #bdd8b4;
+  --pep-green-active: #a8c0a0;
 
   /* Accent — red (errors) */
   --pep-red: #ff8c8c;
@@ -45,6 +47,22 @@
 
   /* Motion */
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1); /* strong ease-out for UI */
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1); /* strong ease-in-out, for on-screen movement */
+  --ease-in: cubic-bezier(0.68, 0, 0.77, 0); /* mirror of --ease-out — accelerating fall into an impact */
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1); /* iOS-like drawer curve, for the panel-slide transition */
+  /* Deliberately NOT --ease-out/--ease-in for panel-enter-bounce's own
+     legs — both of those are "strong" curves whose two control points
+     share the same y (1,1 / 0,0), which makes almost the entire value
+     change happen in the first fraction of the segment and then sit
+     nearly flat for the rest. Fine for a single big movement (that's
+     what they're tuned for), but on this animation's short, small
+     recoils (1-4% of travel) that flat tail reads as the panel visibly
+     pausing right after each hit, before "resuming" into the bounce —
+     not smooth motion, an artifact of the curve shape. These are gentler
+     standard easeOutQuad/easeInQuad-style curves instead, used only
+     inside @keyframes panel-enter-bounce below. */
+  --ease-bounce-out: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  --ease-bounce-in: cubic-bezier(0.55, 0.06, 0.68, 0.19);
   --pep-gold-gradient-angle: 135deg;
 }
 
@@ -83,30 +101,155 @@ body {
 }
 
 /* ==========================================================================
-   Shared / cross-view
+   Panel transition (App.vue + KioskShell.vue)
    ========================================================================== */
 
-/* Placeholder used by CheckView and CheckoutView (M3/M4 not built yet) —
-   identical on both, kept as one shared rule instead of duplicating it. */
-.placeholder-screen {
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  background: var(--pep-panel-gradient);
-  color: var(--pep-white);
+/* The deferred "swipe" from design.md's Motion section — went through a
+   few corrections before landing here:
+   1st attempt: swapped the whole KioskShell instance per-view, so the
+   entire screen (blue panel + white strip, logo, everything)
+   unmounted/remounted on every navigation — read as a slow, unclear page
+   reload, not a swipe.
+   2nd attempt: KioskShell made persistent, but the panel's background
+   stayed static while only its content slid over it — user wanted the
+   whole colored surface to move, not just content over a fixed backdrop.
+   3rd attempt: background moved onto the sliding element, but used a
+   carousel (old exits left, new enters from the right simultaneously) —
+   not what was asked either.
+   Final: this is a side-drawer close/reopen, not a carousel — the panel
+   fully exits left, THEN the new one enters from that same left edge.
+   Both phases share one edge, so they must be sequential (mode="out-in"
+   on the Vue Transition in App.vue) — running them simultaneously from
+   the same edge leaves a gap uncovered in the middle of the transition
+   (the math: at the midpoint each panel sits exactly translateX(-50%),
+   leaving the window's other half showing neither). Sequential also
+   means the leaving element never coexists with the entering one, so
+   the earlier `position: absolute` leave-time hack isn't needed —
+   ordinary in-flow positioning is enough since there's only ever one
+   panel in the DOM at a time. */
+/* Card mode: same-edge drawer. The exit is a plain slide to fully hidden
+   — no catch on the way out. The entrance is where the bounce lives: the
+   incoming panel travels right, hits the white strip, recoils back left,
+   hits again (smaller), and settles — a decaying two-hit bounce like an
+   actual dropped ball, not one hit with a hold in the middle (a flat hold
+   right at impact is what read as "artificial" — a real bounce has no
+   pause, energy just keeps transferring back and forth, shrinking each
+   time). A real spring would give this for free, but the project has no
+   animation library yet, so hand-authored @keyframes is the cheaper tool
+   for this one-off. */
+.panel-slide-leave-active {
+  transition: transform 350ms var(--ease-drawer);
 }
 
-.placeholder-hint {
-  color: var(--pep-white);
-  opacity: 0.75;
-  font-size: 0.9rem;
+/* Third, smallest hit added on top of the original two — same decaying
+   ratio as the first pair, and the same alternating "leaving an impact"
+   (decelerating) / "falling into the next one" (accelerating) per leg —
+   now using --ease-bounce-out/--ease-bounce-in (see :root) instead of
+   the site's strong --ease-out/--ease-in tokens. Those flatten out too
+   hard right after the fast part of each short recoil, which read as a
+   brief pause at every hit rather than continuous motion — gentler
+   curves fixed that same way at every leg, including the very first
+   approach into hit 1 (falling into an impact same as any other). */
+@keyframes panel-enter-bounce {
+  0% {
+    transform: translateX(-100%);
+    animation-timing-function: var(--ease-bounce-in);
+  }
+  46% {
+    transform: translateX(1%);
+  }
+  57% {
+    transform: translateX(-3%);
+    animation-timing-function: var(--ease-bounce-out);
+  }
+  68% {
+    transform: translateX(0%);
+    animation-timing-function: var(--ease-bounce-in);
+  }
+  74.5% {
+    transform: translateX(-1.05%);
+    animation-timing-function: var(--ease-bounce-out);
+  }
+  81% {
+    transform: translateX(0%);
+    animation-timing-function: var(--ease-bounce-in);
+  }
+  85% {
+    transform: translateX(-0.37%);
+    animation-timing-function: var(--ease-bounce-out);
+  }
+  89%,
+  100% {
+    transform: translateX(0%);
+    animation-timing-function: var(--ease-bounce-in);
+  }
 }
 
-/* ScreenLabel.vue — plain caption naming the current screen, not a
-   button, so no background/pill/shadow that would invite a tap. */
+.panel-slide-enter-active {
+  /* No timing-function argument here on purpose — every keyframe above
+     now sets its own explicit animation-timing-function, so a default on
+     the shorthand would never actually apply to anything and is just
+     noise/misdirection for whoever reads this next. */
+  animation: panel-enter-bounce 650ms;
+}
+
+.panel-slide-leave-to {
+  transform: translateX(-100%);
+}
+
+.panel-slide-enter-from {
+  transform: translateX(-100%);
+}
+
+/* Full-bleed mode: the panel's background/position stays fully static —
+   sliding or moving the whole color mass (any direction, or a naive
+   crossfade of the whole .panel-view including its background) still
+   reads as "the floor moving", not an object changing place — see the
+   card-mode note above, that finding stands. What changed: .panel now
+   carries a permanent matching gradient (see .panel above), so fading
+   just the routed .panel-view's opacity no longer reveals anything behind
+   it — the background reads as static throughout, and only the content
+   sitting on top (form, buttons, credits) visibly crossfades. This is the
+   "how do the buttons/PIN input themselves disappear during a transition"
+   follow-up flagged in design.md — a content-level fade, not a reintroduction
+   of panel-level motion. The click-triggered ripple (.ripple-ring below)
+   still layers on top of this for the button-press moment specifically. */
+.kiosk:not(.kiosk--card) .panel-slide-enter-active,
+.kiosk:not(.kiosk--card) .panel-slide-leave-active {
+  /* Card mode's enter uses `animation` (the bounce), not `transition` —
+     overriding only `transition` here left that animation running
+     unopposed in full mode too, since they're separate properties and
+     don't compete in the cascade. Both must be killed explicitly. */
+  transition: opacity 220ms var(--ease-in-out);
+  animation: none;
+}
+
+.kiosk:not(.kiosk--card) .panel-slide-enter-from,
+.kiosk:not(.kiosk--card) .panel-slide-leave-to {
+  opacity: 0;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel-slide-enter-active,
+  .panel-slide-leave-active {
+    animation: none !important;
+    transition: opacity 150ms ease !important;
+  }
+
+  .panel-slide-enter-from,
+  .panel-slide-leave-to {
+    transform: none !important;
+    opacity: 0;
+  }
+}
+
+/* ==========================================================================
+   ScreenLabel.vue — shared
+   ========================================================================== */
+
+/* Plain caption naming the current screen, not a button, so no
+   background/pill/shadow that would invite a tap. */
 .screen-label {
   display: block;
   font-size: 0.7rem;
@@ -117,8 +260,13 @@ body {
 }
 
 /* ==========================================================================
-   LoginView (/chronology)
+   KioskShell.vue — shared shell for every screen (Login, Menu, Checkout)
    ========================================================================== */
+
+.kiosk-stage {
+  width: 100vw;
+  height: 100vh;
+}
 
 .kiosk {
   display: flex;
@@ -129,10 +277,6 @@ body {
 .panel {
   position: relative;
   flex: 0 0 75%;
-  background-image: var(--pep-panel-gradient);
-  display: flex;
-  align-items: center;
-  justify-content: center;
   overflow: hidden;
   /* Only the inner edge (against the white strip) is rounded — the outer
      edges sit flush against the real viewport, nothing to round them
@@ -140,9 +284,54 @@ body {
      wrapper around the whole page. Bottom-right left square on purpose —
      trying rounded-top-only to see if it reads more interesting. */
   border-top-right-radius: var(--pep-frame-radius);
+  border-bottom-right-radius: var(--pep-frame-radius);
   /* filter, not box-shadow: box-shadow would get clipped by this
      element's own overflow:hidden (needed for the gradient + radius). */
   filter: drop-shadow(6px 0 20px rgba(15, 50, 90, 0.3));
+  /* Permanent backdrop, matching .panel-view's own gradient exactly. Not
+     decorative — this is what makes the full-bleed content crossfade below
+     possible: since .panel (this element) never unmounts, whatever shows
+     through a routed .panel-view mid-fade is this identical gradient, not
+     the page's default background. Two identical gradients blended at any
+     opacity are indistinguishable from either alone, so the background
+     reads as perfectly static through the whole transition — only the
+     content sitting on top of it (which has no such backdrop double)
+     visibly fades. Without this, fading .panel-view's opacity flashes
+     whatever's behind it, which is exactly the "floor moving" artifact
+     full-bleed panel-level motion was rejected for (see main.css's Panel
+     transition section) — this sidesteps that failure mode rather than
+     reopening the question of panel-level motion. */
+  background-image: var(--pep-panel-gradient);
+}
+
+/* Sizing/clipping anchor for the sliding panel content — always mounted
+   (KioskShell itself never remounts, see the Panel transition section
+   above), fills .panel exactly. */
+.panel-content {
+  position: absolute;
+  inset: 0;
+}
+
+/* Every view's own root wrapper (LoginView, CheckView, CheckoutView).
+   Carries the blue gradient itself (not .panel) — the whole colored
+   surface needs to be part of what slides, not a static backdrop with
+   only the content sliding over it. Also carries .credits for the same
+   reason: it's meant to read as part of "the blue screen", so it needs
+   to travel with it, not sit static while the color moves underneath. */
+.panel-view {
+  position: relative;
+  /* Establishes its own stacking context so .ripple-ring's z-index: -1
+     is scoped here — without this, `position: relative` alone doesn't
+     create one, and the negative z-index escapes up to .panel (which
+     does have a stacking context, from its `filter`) and ends up behind
+     this element's own background, i.e. fully invisible. */
+  isolation: isolate;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-image: var(--pep-panel-gradient);
 }
 
 /* Portrait tablet: 80% blue makes the white strip cramped. 75% reads
@@ -152,6 +341,491 @@ body {
     flex-basis: 70%;
   }
 }
+
+.credits {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.8);
+  text-align: center;
+}
+
+/* Full-bleed mode, click feedback on the "Anmelden" button (see
+   LoginView.vue's spawnRipple). Previous attempts: a filled white disc
+   (read as a flash), three white hairline rings (read as objects flying
+   apart), a soft white glow (better, but a foreign white tint sitting on
+   the blue rather than the blue itself moving). This version reuses
+   --pep-panel-gradient's own stops radially — light center fading through
+   the panel's own mid and dark blue — so growing it reads as "the panel's
+   blue redistributing" rather than a different color laid over it.
+   z-index: -1 puts it behind the panel's own in-flow content (the form,
+   the button): a positioned element with z-index:auto always paints above
+   in-flow static content regardless of DOM order, so without this the
+   glow always sat on top of the button being pressed, which is backwards
+   — it should look like it's welling up from underneath. Grown via
+   width/height (not transform: scale) so the gradient's percentage-based
+   stops keep their proportions as it expands. */
+@keyframes ripple-glow-grow {
+  0% {
+    width: 40px;
+    height: 40px;
+    opacity: 0.85;
+  }
+  /* ease-out on width/height (below) front-loads the size growth into
+     the first ~17% of the duration, so it visually reaches the panel's
+     edges around there. Fading right at that point (tried at 17-28%)
+     dropped it to zero while the circle was still small/mid-size,
+     showing up as a sharp, contrasty ring — fading a shape out while
+     it's still compact leaves a visible edge. Holding until 57% then
+     fading across the rest of the duration (not a fast fade right after)
+     means it's much larger and softer by the time it's gone, so there's
+     no sharp boundary to see — while still not hanging around doing
+     nothing for seconds like the original 85% hold did. */
+  57% {
+    opacity: 0.75;
+  }
+  100% {
+    width: var(--ripple-diameter);
+    height: var(--ripple-diameter);
+    opacity: 0;
+  }
+}
+
+.ripple-ring {
+  position: absolute;
+  z-index: -1;
+  left: 0;
+  top: 0;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  /* Alpha fades continuously across the whole radius (not just the last
+     15%) so there's no point where a solid-colored disc meets a thin
+     blurred rim — the previous version stayed near-opaque out to 85%
+     and only softened right at the edge, which still read as a circle
+     with a fuzzy border rather than a diffuse glow. */
+  background: radial-gradient(
+    circle,
+    rgba(75, 175, 224, 0.85) 0%,
+    rgba(42, 143, 210, 0.45) 30%,
+    rgba(31, 111, 160, 0.18) 60%,
+    transparent 100%
+  );
+  filter: blur(10px);
+  pointer-events: none;
+  width: 40px;
+  height: 40px;
+  opacity: 0;
+  /* var(--ease-out), not linear: linear was tried to make growth and
+     fade line up, but it changed the feel of the whole 4s reveal, which
+     the user was already happy with. Fixed the actual complaint (opacity
+     hanging around doing nothing after the glow visually arrives)
+     directly in the opacity keyframes above instead — the growth curve
+     is back to what it was. */
+  animation: ripple-glow-grow 4000ms var(--ease-out) forwards;
+}
+
+/* Tried a white glint on the ring itself first (see git history) — it
+   renders inside .ripple-ring, so it's capped by THAT element's own
+   fading opacity no matter when it's timed; pushing the ring's own fade
+   later just delayed the same ceiling problem, it never got bright
+   enough to read as a flash. Moved the "done" cue off the ring entirely:
+   a separate overlay, sibling to it, spawned once the glow has fully
+   dissolved (LoginView.vue delays it via animation-delay matching the
+   glow's own duration) — an inset glow along the panel's own edges,
+   there and gone in under a second, reading as "the action landed"
+   rather than trying to make the dissolving circle itself flash.
+   First pass used a 90px blur / 10px spread — that read as the whole
+   screen fogging over, not a flash. A flash needs a thin, sharp-ish line
+   that a soft haze doesn't: small spread, small blur.
+   Switched from a light edge to a dark one (a shade darker than the
+   panel gradient's own darkest stop, #1f6fa0) — the same idea as
+   .btn-gold/.btn-green's :active press shadow, just inset around the
+   whole panel instead of under one button: a darker inner edge reads as
+   the surface getting pressed in, which is the depth cue asked for here.
+   Scaling the panel itself via transform was ruled out as the way to get
+   that (it would visibly jump/resize, not a subtle press) — a shadow
+   alone gives the depth illusion without moving anything. */
+.panel-complete-flash {
+  position: absolute;
+  inset: 0;
+  /* Matches .panel's own rounded corner (the only one it has, top-right,
+     where it meets the white strip) — without this the flash is a plain
+     rectangle, and its inset box-shadow doesn't follow the curve there,
+     so it looked cut off / missing right at that corner. */
+  border-top-right-radius: var(--pep-frame-radius);
+  pointer-events: none;
+  box-shadow: inset 0 0 35px 1px rgba(8, 25, 45, 0.30);
+  opacity: 0;
+  animation: panel-complete-flash-fade 1200ms var(--ease-in-out) forwards;
+}
+
+@keyframes panel-complete-flash-fade {
+  0% {
+    opacity: 0;
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ripple-ring,
+  .panel-complete-flash {
+    display: none;
+  }
+}
+
+.strip {
+  position: relative;
+  flex: 1;
+  /* No explicit background in full-bleed mode on purpose: .panel's
+     drop-shadow filter bleeds slightly past its own rounded corner, and
+     an opaque .strip clips that bleed with a hard rectangular edge right
+     at the corner — a visible dark sliver/triangle artifact. Leaving
+     .strip transparent lets the shadow fade into the (also white) body
+     background instead, with no hard edge to clip against. */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+/* Card mode doesn't have this problem — .kiosk--card resets .panel's
+   filter to none — but it DOES need the opaque white here, otherwise the
+   gray page backdrop bleeds through and the strip-card loses contrast
+   against it (same color, but reads washed out next to gray vs. white). */
+.kiosk--card .strip {
+  background: var(--pep-white);
+}
+
+.strip-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 40px;
+}
+
+.logo img {
+  height: 65px;
+  display: block;
+}
+
+.strip-card {
+  width: 100%;
+  max-width: 260px;
+  padding: 20px 24px;
+  border-radius: 16px;
+  background: var(--pep-primary-blue-soft);
+  text-align: center;
+  overflow: hidden;
+  transition: background-color 250ms ease, transform 200ms var(--ease-out);
+}
+
+/* Flips to the full brand blue while a message is active, so the update
+   reads as a state change rather than a quiet text swap. */
+.strip-card--active {
+  background: var(--pep-primary-blue);
+  transform: scale(1.04);
+}
+
+/* Good-news variant (e.g. returning from a pause) — same green as
+   .btn-green instead of the generic active blue, with dark ink text since
+   the green is pale rather than a saturated brand color. */
+.strip-card--positive {
+  background: var(--pep-green);
+}
+
+/* Going INTO a pause — the gold counterpart to --positive's green, so
+   starting vs. ending a pause read as two distinct color-coded states
+   instead of both flashing the same generic active blue. Pale like
+   --positive, not the saturated --pep-gold used on .btn-gold, for the
+   same dark-ink-text reason. */
+.strip-card--pause {
+  background: var(--pep-gold-bg-soft);
+}
+
+.strip-eyebrow {
+  margin: 0 0 6px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--pep-primary-blue);
+  transition: color 250ms ease;
+}
+
+.strip-message {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--pep-ink);
+  line-height: 1.4;
+  transition: color 250ms ease;
+}
+
+.strip-card--active .strip-eyebrow,
+.strip-card--active .strip-message {
+  color: var(--pep-white);
+}
+
+.strip-card--positive .strip-eyebrow,
+.strip-card--positive .strip-message,
+.strip-card--pause .strip-eyebrow,
+.strip-card--pause .strip-message {
+  color: var(--pep-ink);
+}
+
+.strip-divider {
+  width: 40px;
+  height: 1px;
+  background: var(--pep-primary-blue);
+  margin: 0 auto 15px;
+}
+
+/* Each message swap slides in from below / out toward the top, like a
+   ticker handing off to the next line. */
+.strip-msg-enter-active,
+.strip-msg-leave-active {
+  transition: transform 200ms var(--ease-out), opacity 200ms var(--ease-out);
+}
+
+.strip-msg-enter-from {
+  opacity: 0;
+  transform: translateY(14px);
+}
+
+.strip-msg-leave-to {
+  opacity: 0;
+  transform: translateY(-14px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .strip-card--active {
+    transform: none;
+  }
+
+  .strip-msg-enter-from,
+  .strip-msg-leave-to {
+    transform: none;
+  }
+}
+
+/* ==========================================================================
+   Card layout mode — alternate to the full-bleed split, toggled live via
+   .layout-toggle. A fixed-size card floating on a neutral gray page
+   instead of the kiosk filling the whole viewport. Explored once before
+   as the *only* option and rejected outright (it hid how the page
+   actually renders full-screen) — this time it's a comparison toggle,
+   not a replacement, so both stay available.
+   ========================================================================== */
+
+.kiosk-stage--card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f2f3f5;
+}
+
+.kiosk--card {
+  width: min(1000px, 95vw);
+  height: min(500px, 90vh);
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 24px 60px rgba(20, 40, 70, 0.25);
+}
+
+/* Ratio moves from 75/25 to 62/38 — at this much smaller absolute size,
+   75/25 left too little room in the white side for its content. */
+.kiosk--card .panel {
+  flex: 0 0 62%;
+  /* The outer card's own border-radius + overflow:hidden already rounds
+     all four corners uniformly — the panel doesn't need its own partial
+     radius or the separation-shadow filter used in full-bleed mode. */
+  border-radius: 0;
+  filter: none;
+  /* .panel's own permanent gradient (added for the full-bleed content
+     crossfade, see main.css's Panel transition section) is a full-bleed
+     concern — in card mode it just means the drawer's exit reveals the
+     same saturated blue behind the sliding panel, which reads like
+     nothing moved at all. Card mode wants that reveal to read as neutral
+     empty space instead, so it gets the pale token here rather than the
+     gradient. */
+  background-image: none;
+  background-color: var(--pep-primary-blue-soft);
+}
+
+/* Inner content (PIN form, buttons) intentionally keeps the exact same
+   sizing it uses in full-bleed mode — a first pass stretched everything
+   to fill the column's width (matching a reference mock literally), and
+   a full-width PIN input for a few digits just looked wrong. Only the
+   outer frame changes between modes, not how the form is proportioned. */
+
+.layout-toggle {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--pep-line);
+  border-radius: 999px;
+  background: var(--pep-white);
+  color: var(--pep-mute);
+  cursor: pointer;
+  transition: var(--pep-transition);
+}
+
+.layout-toggle:hover {
+  color: var(--pep-primary-blue);
+  border-color: var(--pep-primary-blue);
+}
+
+/* ==========================================================================
+   Buttons — shared across every screen
+   ========================================================================== */
+
+.btn-gold {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 56px;
+  padding: 1rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 700;
+  font-family: inherit;
+  white-space: nowrap;
+  color: var(--pep-ink);
+  /* Referencing --pep-gold-gradient-angle directly rather than through
+     the --pep-gold-gradient token — chaining the animated angle through
+     a second custom property broke the transition (Chrome kept
+     resolving the nested var() to its pre-animation value on
+     background-image specifically). */
+  background: linear-gradient(var(--pep-gold-gradient-angle), #f6d27a, #c9922e);
+  border: none;
+  border-radius: var(--pep-radius-lg);
+  /* State 1 (default): gradient only, no shadow, no size change. */
+  cursor: pointer;
+  transition:
+    var(--pep-transition),
+    /* Slowed from 650ms to match the pace of the full-bleed screen's
+       other motion (the ripple glow, the completion flash) — at 650ms
+       this small, high-contrast sweep read as noticeably snappier than
+       everything else now that the rest has gotten slower and softer. */
+      --pep-gold-gradient-angle 1000ms var(--ease-out),
+    transform 140ms var(--ease-out),
+    box-shadow 140ms var(--ease-out);
+}
+
+/* State 2 (hover, mouse only): gradient swaps, a thin light shadow
+   appears for the first time, button shrinks a couple pixels — as if
+   touched. Scale, not translateY: translating the box on :hover shifts
+   the hit box under a stationary cursor near an edge and flickers
+   hover on/off in a loop. Scale shrinks from the center instead, which
+   is a far smaller edge-position change and doesn't trigger that. */
+@media (hover: hover) and (pointer: fine) {
+  .btn-gold:hover {
+    --pep-gold-gradient-angle: 315deg;
+    transform: scale(0.985);
+    box-shadow: 0 2px 5px rgba(90, 60, 10, 0.22);
+  }
+}
+
+/* State 3 (press/active — the real touch trigger): shrinks further, and
+   the shadow gets MORE visible, darker, tighter — not fainter. Gradient
+   doesn't move again, it already swapped at hover/first touch. */
+.btn-gold:active {
+  --pep-gold-gradient-angle: 315deg;
+  transform: scale(0.965);
+  box-shadow: 0 1px 2px rgba(70, 45, 10, 0.45);
+}
+
+.btn-gold:focus-visible {
+  outline: 2px solid var(--pep-primary-blue);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn-gold:hover,
+  .btn-gold:active {
+    transform: none;
+  }
+}
+
+/* Same structural recipe as .btn-gold (thin shadow + slight shrink on
+   hover, darker/tighter shadow + further shrink on press) but with a
+   flat color swap instead of a gradient-angle rotation — there's no
+   second green tone given yet to swap toward. */
+.btn-green {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 56px;
+  padding: 1rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 700;
+  font-family: inherit;
+  white-space: nowrap;
+  color: var(--pep-ink);
+  background: var(--pep-green);
+  border: none;
+  border-radius: var(--pep-radius-lg);
+  cursor: pointer;
+  transition:
+    var(--pep-transition),
+    transform 140ms var(--ease-out),
+    box-shadow 140ms var(--ease-out);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .btn-green:hover {
+    background: var(--pep-green-hover);
+    transform: scale(0.985);
+    box-shadow: 0 2px 5px rgba(30, 70, 20, 0.2);
+  }
+}
+
+.btn-green:active {
+  background: var(--pep-green-active);
+  transform: scale(0.965);
+  box-shadow: 0 1px 2px rgba(20, 50, 15, 0.4);
+}
+
+.btn-green:focus-visible {
+  outline: 2px solid var(--pep-primary-blue);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn-green:hover,
+  .btn-green:active {
+    transform: none;
+  }
+}
+
+/* Pressed-and-waiting-for-redirect state (Pause starten/beenden swap to
+   this instead of navigating instantly) — dimmed, inert, no hover/press
+   effects while the icon+label already show the confirmed state. */
+.btn-gold:disabled,
+.btn-green:disabled {
+  opacity: 0.65;
+  cursor: default;
+  pointer-events: none;
+}
+
+/* ==========================================================================
+   LoginView (/chronology)
+   ========================================================================== */
 
 .pin-form {
   display: flex;
@@ -215,169 +889,305 @@ body {
   text-align: center;
 }
 
-.btn-anmelden {
-  min-height: 56px;
-  padding: 1rem 1.5rem;
-  font-size: 1rem;
-  font-weight: 700;
-  color: var(--pep-ink);
-  /* Referencing --pep-gold-gradient-angle directly rather than through
-     the --pep-gold-gradient token — chaining the animated angle through
-     a second custom property broke the transition (Chrome kept
-     resolving the nested var() to its pre-animation value on
-     background-image specifically). */
-  background: linear-gradient(var(--pep-gold-gradient-angle), #f6d27a, #c9922e);
-  border: none;
-  border-radius: var(--pep-radius-lg);
-  /* State 1 (default): gradient only, no shadow, no size change. */
-  cursor: pointer;
-  transition:
-    var(--pep-transition),
-    --pep-gold-gradient-angle 650ms var(--ease-out),
-    transform 140ms var(--ease-out),
-    box-shadow 140ms var(--ease-out);
-}
+/* ==========================================================================
+   CheckView (/chronology/check) — menu (Pause starten / Zum Checkout)
+   and Pause beenden share this file, branching on DayState
+   ========================================================================== */
 
-/* State 2 (hover, mouse only): gradient swaps, a thin light shadow
-   appears for the first time, button shrinks a couple pixels — as if
-   touched. Scale, not translateY: translating the box on :hover shifts
-   the hit box under a stationary cursor near an edge and flickers
-   hover on/off in a loop. Scale shrinks from the center instead, which
-   is a far smaller edge-position change and doesn't trigger that. */
-@media (hover: hover) and (pointer: fine) {
-  .btn-anmelden:hover {
-    --pep-gold-gradient-angle: 315deg;
-    transform: scale(0.985);
-    box-shadow: 0 2px 5px rgba(90, 60, 10, 0.22);
-  }
-}
-
-/* State 3 (press/active — the real touch trigger): shrinks further, and
-   the shadow gets MORE visible, darker, tighter — not fainter. Gradient
-   doesn't move again, it already swapped at hover/first touch. */
-.btn-anmelden:active {
-  --pep-gold-gradient-angle: 315deg;
-  transform: scale(0.965);
-  box-shadow: 0 1px 2px rgba(70, 45, 10, 0.45);
-}
-
-.btn-anmelden:focus-visible {
-  outline: 2px solid var(--pep-primary-blue);
-  outline-offset: 2px;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .btn-anmelden:hover,
-  .btn-anmelden:active {
-    transform: none;
-  }
-}
-
-.credits {
-  position: absolute;
-  bottom: 24px;
-  left: 50%;
-  transform: translateX(-50%);
-  margin: 0;
-  font-size: 0.75rem;
-  color: rgba(255, 255, 255, 0.8);
-  text-align: center;
-}
-
-.strip {
-  position: relative;
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-}
-
-.strip-content {
+.check-content {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 30px;
 }
 
-.logo img {
-  height: 65px;
-  display: block;
-}
-
-.strip-card {
-  width: 100%;
-  max-width: 260px;
-  padding: 20px 24px;
-  border-radius: 16px;
-  background: var(--pep-primary-blue-soft);
+.check-name {
+  color: var(--pep-white);
+  font-size: 2.4rem;
+  font-weight: 700;
+  margin: 0 0 32px;
   text-align: center;
+}
+
+.check-actions {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  /* Generous gap on purpose — the ticket explicitly flags accidental taps
+     as a real problem on a touch kiosk, so the two buttons need real
+     separation even sitting side by side, not just visual distinction. */
+  gap: 32px;
+}
+
+.check-actions--single {
+  justify-content: center;
+}
+
+/* ==========================================================================
+   CheckoutView (/chronology/checkout)
+   ========================================================================== */
+
+.checkout-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: min(420px, 90%);
+}
+
+/* "Mitarbeiter mittig darstellen" (ticket annotation) — .check-name already
+   centers the name; reused here as-is rather than a second near-identical
+   rule. */
+
+/* Round 1 table treatment — user compared both live and picked round 2
+   below. Kept here commented rather than deleted.
+
+.checkout-table {
+  width: 100%;
+  margin-bottom: 24px;
+  border-collapse: collapse;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: var(--pep-radius-lg);
   overflow: hidden;
-  transition: background-color 250ms ease, transform 200ms var(--ease-out);
-}
-
-/* Flips to the full brand blue while a message is active, so the update
-   reads as a state change rather than a quiet text swap. */
-.strip-card--active {
-  background: var(--pep-primary-blue);
-  transform: scale(1.04);
-}
-
-.strip-eyebrow {
-  margin: 0 0 6px;
-  font-size: 0.7rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--pep-primary-blue);
-  transition: color 250ms ease;
-}
-
-.strip-message {
-  margin: 0;
-  font-size: 1.05rem;
-  font-weight: 700;
-  color: var(--pep-ink);
-  line-height: 1.4;
-  transition: color 250ms ease;
-}
-
-.strip-card--active .strip-eyebrow,
-.strip-card--active .strip-message {
   color: var(--pep-white);
 }
 
-.strip-divider {
-  width: 40px;
-  height: 1px;
-  background: var(--pep-line);
-  margin-bottom: 16px;
+.checkout-table th,
+.checkout-table td {
+  padding: 10px 16px;
+  text-align: center;
 }
 
-/* Each message swap slides in from below / out toward the top, like a
-   ticker handing off to the next line. */
-.strip-msg-enter-active,
-.strip-msg-leave-active {
-  transition: transform 200ms var(--ease-out), opacity 200ms var(--ease-out);
+.checkout-table th {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(255, 255, 255, 0.75);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.25);
 }
 
-.strip-msg-enter-from {
+.checkout-table td {
+  font-size: 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.checkout-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.checkout-table-icon {
+  color: rgba(255, 255, 255, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.checkout-table-row--summe td {
+  font-weight: 700;
+  border-top: 1px solid rgba(255, 255, 255, 0.35);
+}
+
+*/
+
+/* Round 2 — a frosted-glass summary list instead of a literal table:
+   circular icon badges, an explicit text label per row (Checkin/
+   Checkout/Pause/Summe) so row identity doesn't rely on icon recognition
+   alone, and each row's own Stempel value large/bold with its Plan value
+   small and muted underneath rather than two equal-weight table columns
+   — the actual stamped time is what matters most at a glance, Plan is
+   reference. ACTIVE — user picked this one after comparing both live,
+   plans to revisit the icons and time formatting further later. */
+.checkout-summary {
+  width: 100%;
+  margin-bottom: 24px;
+  padding: 0 20px;
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: var(--pep-radius-lg);
+}
+
+.checkout-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.checkout-row:last-child {
+  border-bottom: none;
+}
+
+.checkout-row-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.checkout-row-label {
+  flex: 1;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-align: left;
+}
+
+.checkout-row-values {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.3;
+}
+
+.checkout-row-stempel {
+  color: var(--pep-white);
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.checkout-row-plan {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.75rem;
+}
+
+.checkout-row--summe .checkout-row-icon {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.checkout-row--summe .checkout-row-stempel {
+  font-size: 1.2rem;
+}
+
+/* Summe's own Stempel value turns green once actual worked time reaches
+   the planned total — a small live cue that the workday's target is met,
+   without adding a whole banner/badge for it. */
+.summe-value {
+  transition: color 200ms ease;
+}
+
+.summe-value.reached {
+  color: #b7e4a0;
+}
+
+.notiz-field {
+  width: 100%;
+  margin-bottom: 24px;
+}
+
+.notiz-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  color: var(--pep-white);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+/* Custom hover bubble, not the native `title` attribute — the ticket
+   explicitly asks for a visible hint window on hover ("wenn man da
+   drauf hovert, dann [Erklärtext]"), and a native title tooltip is both
+   slow to appear and unstyled, which doesn't read as an intentional part
+   of the UI. `tabindex` on the wrapper (not the icon itself) gives
+   keyboard users a way to reveal it via :focus-visible too. */
+.info-tooltip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  /* Padding + matching negative margin: the trigger area (whole "Notiz"
+     word plus icon) is bigger than what's visually drawn, so a finger on
+     a touch kiosk has real room to land on — just the 14px icon alone
+     was too small a target on an iPad. Only compensating horizontally
+     (margin-left/-right, not the `margin` shorthand) on purpose — the
+     shorthand would overwrite .notiz-label's own margin-bottom on this
+     same element (equal specificity, this rule comes later), which is
+     exactly what happened the first time: it collapsed to 0, and "Notiz"
+     ended up sitting flush on the input below with no gap at all. */
+  padding: 8px 10px;
+  margin-left: -10px;
+  margin-right: -10px;
+  border-radius: var(--pep-radius);
+  cursor: help;
+}
+
+.info-tooltip svg {
+  color: rgba(255, 255, 255, 0.75);
+  flex-shrink: 0;
+}
+
+.info-tooltip-bubble {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 10px);
+  transform: translateX(-50%) translateY(4px);
+  width: max-content;
+  max-width: 240px;
+  padding: 10px 12px;
+  background: var(--pep-ink);
+  color: var(--pep-white);
+  font-size: 0.8rem;
+  font-weight: 400;
+  line-height: 1.4;
+  text-align: left;
+  border-radius: var(--pep-radius);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
   opacity: 0;
-  transform: translateY(14px);
+  pointer-events: none;
+  transition: opacity 150ms ease, transform 150ms ease;
+  z-index: 2;
 }
 
-.strip-msg-leave-to {
-  opacity: 0;
-  transform: translateY(-14px);
+/* Small arrow pointing from the bubble down at the icon that triggered it. */
+.info-tooltip-bubble::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top-color: var(--pep-ink);
+}
+
+.info-tooltip:hover .info-tooltip-bubble,
+.info-tooltip:focus-visible .info-tooltip-bubble {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.info-tooltip:focus-visible {
+  outline: 2px solid var(--pep-primary-blue);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .strip-card--active {
-    transform: none;
-  }
-
-  .strip-msg-enter-from,
-  .strip-msg-leave-to {
-    transform: none;
+  .info-tooltip-bubble {
+    transition: none;
   }
 }
+
+.notiz-input {
+  width: 100%;
+  padding: 0.875rem 1.25rem;
+  font-size: 1rem;
+  font-family: inherit;
+  border: none;
+  border-radius: var(--pep-radius-lg);
+  background: var(--pep-white);
+  color: var(--pep-ink);
+  box-shadow: 0 3px 10px rgba(10, 40, 80, 0.18);
+  transition: var(--pep-transition);
+}
+
+.notiz-input::placeholder {
+  color: var(--pep-mute);
+}
+
