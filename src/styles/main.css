@@ -6,7 +6,7 @@
   /* Toned down twice now — first from the navy(#024)->skyblue jump (muddy
      middle in sRGB), then again because the dark end still read as too
      much contrast next to the MarcoPolo reference's fairly even blue. */
-  --pep-panel-gradient: linear-gradient(135deg, #4bafe0 0%, #2a8fd2 60%, #1f6fa0 100%);
+  --pep-panel-gradient: linear-gradient(135deg, #4bafe0 0%, #2a8fd2 40%, #1f6fa0 100%);
   /* Darkened further from the gradient's own darkest stop (#1f6fa0) —
      used as a fixed focus-ring color on the white inputs (see .pin-input
      / .notiz-input :focus-visible) so it always reads as "this app's
@@ -46,11 +46,19 @@
 
   /* Accent — red (errors) */
   --pep-red: #ff8c8c;
+  /* Pale card background, same "soft" treatment as --pep-gold-bg-soft /
+     --pep-green for the strip card's positive/pause variants. */
+  --pep-red-bg-soft: #fbe2e2;
+  /* Darkened from --pep-red — the pale card bg needs a deeper red for the
+     "FEHLER" eyebrow to read as an alert at a glance, not just a tinted
+     label; the pastel --pep-red itself is too light for that on a light
+     background. */
+  --pep-red-ink: #a65b5b;
 
   /* Structure */
   --pep-radius: 4px; /* matches Pepito's real desktop-scale buttons */
   --pep-radius-lg: 6px; /* kiosk-scale controls — 10px read as too soft/rounded next to the reference */
-  --pep-frame-radius: 100px; /* inner corners of the blue panel, where it meets the white strip */
+  --pep-frame-radius: 60px; /* inner corner of the blue panel, where it meets the white strip */
   --pep-transition: color 0.15s ease-in-out, background-color 0.15s ease-in-out,
     border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
 
@@ -254,21 +262,6 @@ body {
 }
 
 /* ==========================================================================
-   ScreenLabel.vue — shared
-   ========================================================================== */
-
-/* Plain caption naming the current screen, not a button, so no
-   background/pill/shadow that would invite a tap. */
-.screen-label {
-  display: block;
-  font-size: 0.7rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--pep-mute);
-}
-
-/* ==========================================================================
    KioskShell.vue — shared shell for every screen (Login, Menu, Checkout)
    ========================================================================== */
 
@@ -287,13 +280,10 @@ body {
   position: relative;
   flex: 0 0 75%;
   overflow: hidden;
-  /* Only the inner edge (against the white strip) is rounded — the outer
-     edges sit flush against the real viewport, nothing to round them
-     against. Matches the reference's blue block, not a device-frame
-     wrapper around the whole page. Bottom-right left square on purpose —
-     trying rounded-top-only to see if it reads more interesting. */
+  /* Only the top of the inner edge (against the white strip) is rounded
+     — the outer edges sit flush against the real viewport, nothing to
+     round them against, and bottom-right stays square on purpose. */
   border-top-right-radius: var(--pep-frame-radius);
-  border-bottom-right-radius: var(--pep-frame-radius);
   /* filter, not box-shadow: box-shadow would get clipped by this
      element's own overflow:hidden (needed for the gradient + radius). */
   filter: drop-shadow(6px 0 20px rgba(15, 50, 90, 0.3));
@@ -319,6 +309,16 @@ body {
 .panel-content {
   position: absolute;
   inset: 0;
+}
+
+.panel-breadcrumb {
+  position: absolute;
+  top: 24px;
+  left: 32px;
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.5);
 }
 
 /* Every view's own root wrapper (LoginView, CheckView, CheckoutView).
@@ -350,8 +350,12 @@ body {
   transform: translateX(-50%);
   margin: 0;
   font-size: 0.75rem;
-  color: rgba(255, 255, 255, 0.8);
+  /* Matches .panel-breadcrumb's opacity — breadcrumb (top) + credits
+     (bottom) read as one "background info layer", visually distinct
+     from the centered form itself. */
+  color: rgba(255, 255, 255, 0.5);
   text-align: center;
+  width: 100%;
 }
 
 /* Portrait tablet: 80% blue makes the white strip cramped. 75% reads
@@ -385,6 +389,111 @@ body {
   }
   .credits {
     bottom: 15px;
+  }
+}
+
+/* ==========================================================================
+   EXPERIMENTAL — bottom strip in portrait, full-bleed mode only
+   ========================================================================== */
+
+/* Second pass: swapped which one sits on top — white strip now on top,
+   blue panel on the bottom (was the other way in the first pass; still a
+   prototype, not settled). column-reverse rather than reordering the
+   markup: .strip is already second in the DOM (after .panel), so
+   reversing the axis alone puts it first visually with no markup change
+   needed. Full-bleed mode only (.kiosk--card is excluded, so card mode
+   keeps its existing side-by-side split regardless of orientation,
+   untouched). Every rule here targets .kiosk:not(.kiosk--card), which is
+   more specific than the plain .panel/.strip rules above (3 classes vs.
+   1), so it wins regardless of source order or which width-tier last
+   set flex-basis — flex-basis means height now, not width, once the
+   axis flips.
+   To back this experiment out entirely, delete this block — nothing
+   else references it, so removing it fully restores the side-strip
+   layout with no other cleanup needed. */
+@media (orientation: portrait) {
+  .kiosk:not(.kiosk--card) {
+    flex-direction: column-reverse;
+  }
+
+  /* One rounded corner where blue meets white — now the panel's TOP
+     edge, since the panel is on the bottom this time (the previous pass
+     rounded the bottom edge, when the panel was on top). Bottom stays
+     square: that edge sits flush against the real viewport now, same
+     "only the inner edge rounds" rule the side-strip layout already
+     follows. Shadow direction flipped to match (was cast downward onto
+     the strip below; now cast upward onto the strip above). */
+  .kiosk:not(.kiosk--card) .panel {
+    flex-basis: 80%;
+    border-top-left-radius: var(--pep-frame-radius);
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+    filter: drop-shadow(0 -6px 20px rgba(15, 50, 90, 0.3));
+  }
+
+  /* Matches .panel's own corner swap above — .panel-complete-flash's
+     hardcoded top-right radius (tuned for the side-strip layout, the
+     only corner .panel rounds there) is wrong here: this layout rounds
+     top-LEFT instead, top-right is square. Without this, the flash kept
+     curving top-right anyway, showing up as a rounded patch bleeding
+     past the now-square corner. */
+  .kiosk:not(.kiosk--card) .panel-complete-flash {
+    border-top-right-radius: 0;
+    border-top-left-radius: var(--pep-frame-radius);
+  }
+
+  /* The rounded corner sits top-left in this layout (opposite the
+     side-strip layout's top-right) — the breadcrumb crowded right into
+     that curve there, so it moves to the panel's square top-right
+     corner instead here specifically. Full-bleed only: card mode's
+     panel (.kiosk--card, excluded by :not() above) keeps the plain
+     top-left placement regardless of orientation. */
+  .kiosk:not(.kiosk--card) .panel-breadcrumb {
+    left: auto;
+    right: 32px;
+  }
+
+  .kiosk:not(.kiosk--card) .strip {
+    padding: 20px clamp(20px, 6vw, 36px);
+  }
+
+  /* Third pass: two rows — logo and the page-name caption share the top
+     row at opposite ends, the status message card spans the full width
+     on its own row below. Grid rather than flex specifically because
+     .strip-status comes AFTER .strip-card in the markup (KioskShell.vue
+     authors it last, as "the current screen" caption) but needs to
+     render ABOVE it here — grid-template-areas place pieces by name,
+     independent of source order, instead of juggling `order` across
+     three separate rules. */
+  .kiosk:not(.kiosk--card) .strip-content {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    grid-template-areas:
+      'logo status'
+      'card card';
+    align-items: center;
+    column-gap: 12px;
+    row-gap: 18px;
+    width: 100%;
+  }
+
+  .kiosk:not(.kiosk--card) .logo {
+    grid-area: logo;
+  }
+
+  /* No size override here on purpose — .logo img's own width (see its
+     base rule above) is the one place that controls this, in every
+     layout including this one. An override here previously fought with
+     it: it kept overriding your resize back down every time. */
+
+  /* Full width now that it has its own row instead of sharing one with
+     the logo — the narrower capped width from the previous pass was
+     sized for sitting next to something. */
+  .kiosk:not(.kiosk--card) .strip-card {
+    grid-area: card;
+    width: 100%;
+    max-width: none;
+    text-align: left;
   }
 }
 
@@ -576,17 +685,25 @@ body {
   width: 100%;
   max-width: 260px;
   padding: clamp(14px, 6cqw, 20px) clamp(16px, 7cqw, 24px);
-  border-radius: 16px;
+  border-radius: 13px;
   background: var(--pep-primary-blue-soft);
   text-align: center;
   overflow: hidden;
   transition: background-color 250ms ease, transform 200ms var(--ease-out);
 }
 
-/* Flips to the full brand blue while a message is active, so the update
-   reads as a state change rather than a quiet text swap. */
+/* Flips to the same gradient the main panel uses (not a flat brand blue)
+   while a message is active, so the update reads as a state change
+   rather than a quiet text swap. Matches the panel deliberately: a flat
+   --pep-primary-blue here read as an off, slightly-wrong blue sitting
+   next to the panel's own gradient — same hue family, but visibly a
+   different treatment right beside it. background-image only (not the
+   background shorthand) — .strip-card's own background-color
+   (--pep-primary-blue-soft) stays underneath, irrelevant since the
+   gradient is fully opaque, and reverts cleanly on its own once this
+   class is gone. */
 .strip-card--active {
-  background: var(--pep-primary-blue);
+  background-image: var(--pep-panel-gradient);
   transform: scale(1.04);
 }
 
@@ -604,6 +721,16 @@ body {
    same dark-ink-text reason. */
 .strip-card--pause {
   background: var(--pep-gold-bg-soft);
+}
+
+/* Red counterpart for E1-E5 — previously an error only showed as text
+   under the PIN field, the always-visible strip card never reacted to it
+   at all. Pale background like --positive/--pause, but the eyebrow gets
+   its own darker red (see .strip-card--error .strip-eyebrow below)
+   instead of the shared ink color those two use, so "FEHLER" reads as an
+   alert at a glance rather than just another label. */
+.strip-card--error {
+  background: var(--pep-red-bg-soft);
 }
 
 .strip-eyebrow {
@@ -636,8 +763,13 @@ body {
 .strip-card--positive .strip-eyebrow,
 .strip-card--positive .strip-message,
 .strip-card--pause .strip-eyebrow,
-.strip-card--pause .strip-message {
+.strip-card--pause .strip-message,
+.strip-card--error .strip-message {
   color: var(--pep-ink);
+}
+
+.strip-card--error .strip-eyebrow {
+  color: var(--pep-red-ink);
 }
 
 .strip-divider {
@@ -727,6 +859,16 @@ body {
      gradient. */
   background-image: none;
   background-color: var(--pep-primary-blue-soft);
+}
+
+/* Matches .panel's own reset above — the outer card already rounds all
+   four corners uniformly via overflow: hidden, so .panel-complete-flash
+   (see its own comment) needs the same reset here, otherwise its
+   hardcoded top-right curve (tuned for the full-bleed layout) shows up
+   as a mismatched round patch against the card's actual square inner
+   corner. */
+.kiosk--card .panel-complete-flash {
+  border-radius: 0;
 }
 
 /* Inner content (PIN form, buttons) intentionally keeps the exact same
@@ -994,9 +1136,9 @@ body {
 
 .check-name {
   color: var(--pep-white);
-  font-size: 2.4rem;
+  font-size: 2rem;
   font-weight: 700;
-  margin: 0 0 32px;
+  margin: 0 0 25px;
   text-align: center;
 }
 
@@ -1090,7 +1232,7 @@ body {
    plans to revisit the icons and time formatting further later. */
 .checkout-summary {
   width: 100%;
-  margin-bottom: 20px;
+  margin-bottom: 15px;
   padding: 0 20px;
   background: rgba(255, 255, 255, 0.08);
   backdrop-filter: blur(16px);
@@ -1170,14 +1312,14 @@ body {
 
 .notiz-field {
   width: 100%;
-  margin-bottom: 24px;
+  margin-bottom: 20px;
 }
 
 .notiz-label {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-bottom: 8px;
+  margin-bottom: 5px;
   color: var(--pep-white);
   font-size: 0.85rem;
   font-weight: 700;
@@ -1298,5 +1440,127 @@ body {
 .notiz-input:focus-visible {
   outline: 1.5px solid var(--pep-focus-ring);
   outline-offset: 2px;
+}
+
+/* ==========================================================================
+   DeviceFrame.vue — desktop-only iPad bezel wrapped around an <iframe> of
+   the real app (see main.ts's isTouchDevice/isEmbedded check for when
+   this mounts instead of the app itself). Approximate, not a pixel
+   copy of real iPad hardware on purpose — this is a "so a colleague on a
+   laptop can tell it's meant to be a tablet" cue, not a device mockup.
+   ========================================================================== */
+
+.device-frame-stage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  min-height: 100vh;
+  padding: 40px;
+  background: #dfe3e8;
+  overflow: auto;
+}
+
+.device-frame {
+  position: relative;
+  flex-shrink: 0;
+  border: 14px solid #1a1a1a;
+  border-radius: 40px;
+  background: #1a1a1a;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+  transition: width 250ms ease, height 250ms ease;
+}
+
+.device-frame-screen {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: var(--pep-white);
+}
+
+.device-frame-home-indicator {
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 120px;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.35);
+  pointer-events: none;
+}
+
+.device-frame-controls {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.device-frame-rotate {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--pep-line);
+  border-radius: 999px;
+  background: var(--pep-white);
+  color: var(--pep-mute);
+  cursor: pointer;
+  transition: var(--pep-transition);
+}
+
+.device-frame-rotate:hover {
+  color: var(--pep-primary-blue);
+  border-color: var(--pep-primary-blue);
+}
+
+.device-frame-sizes {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid var(--pep-line);
+  border-radius: 12px;
+  background: var(--pep-white);
+}
+
+.device-frame-size-btn {
+  white-space: nowrap;
+  padding: 6px 12px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  font-family: inherit;
+  text-align: left;
+  color: var(--pep-mute);
+  background: none;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  /* Background only, not the shared --pep-transition (which also
+     animates color): fading text color and background color in at the
+     same time made the label pass through a low-contrast gray-on-blue
+     mid-transition, reading as the text briefly vanishing rather than
+     the pill smoothly filling in behind text that's simply always
+     legible. */
+  transition: background-color 150ms ease-in-out;
+}
+
+/* :not(--active) matters here: plain :hover (one class + one
+   pseudo-class) is more specific than --active alone (one class), so
+   without this exclusion, hovering the already-active blue pill
+   overrode its white text back to blue — invisible on the same blue
+   background, only correcting itself once the mouse moved away. */
+.device-frame-size-btn:hover:not(.device-frame-size-btn--active) {
+  color: var(--pep-primary-blue);
+}
+
+.device-frame-size-btn--active {
+  color: var(--pep-white);
+  background: var(--pep-primary-blue);
 }
 

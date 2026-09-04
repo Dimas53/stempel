@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Lock } from '@lucide/vue'
 import { submitPin } from '@/api/timeClock'
@@ -11,7 +11,7 @@ import { PinError } from '@/types/timeClock'
 
 const router = useRouter()
 const { setCurrentUser } = useSession()
-const { setStatusCard } = useStatusCard()
+const { setStatusCard, setErrorStatusCard, scheduleRevert, tone } = useStatusCard()
 const { layoutMode } = useLayoutMode()
 
 const panelViewRef = ref<HTMLElement | null>(null)
@@ -22,6 +22,29 @@ const IDLE_MESSAGE = 'Bitte gib deinen PIN ein, um dich anzumelden.'
 
 const pin = ref('')
 const errorMessage = ref('')
+// Local to this file, not routed through useStatusCard's pendingRevert —
+// this only ever clears errorMessage (a plain view-local ref), it never
+// touches the shared strip card, so it doesn't need that shared
+// bookkeeping. Tracked anyway so a second E3 in quick succession cancels
+// the first one's clear instead of two competing timers both firing.
+let bottomErrorClearTimer: ReturnType<typeof setTimeout> | null = null
+
+// Clears as soon as the user edits the field at all (typing further OR
+// deleting), not only once a new PIN is successfully submitted — leaving
+// a stale "PIN nicht erkannt" under a field the user has already started
+// correcting reads as if nothing they're typing now matters yet. Same
+// trigger reverts the strip card up top — but only while it's showing
+// something from THIS flow (error red, or E3's "Bereit" green follow-up):
+// this watcher also fires on the pin.value = '' resets this file does
+// itself after a successful checkin/submit, and that path already has
+// its own "Eingecheckt" message to protect (tone is 'default' there,
+// never 'error'/'positive', so this check leaves it alone).
+watch(pin, () => {
+  errorMessage.value = ''
+  if (tone.value === 'error' || tone.value === 'positive') {
+    setStatusCard({ eyebrow: IDLE_EYEBROW, message: IDLE_MESSAGE })
+  }
+})
 
 setStatusCard({ screenLabel: 'Login', eyebrow: IDLE_EYEBROW, message: IDLE_MESSAGE })
 
@@ -39,9 +62,7 @@ async function onSubmit() {
         message: `Herzlich Willkommen ${result.user.firstName}, du bist jetzt eingecheckt`,
         active: true,
       })
-      setTimeout(() => {
-        setStatusCard({ eyebrow: IDLE_EYEBROW, message: IDLE_MESSAGE })
-      }, 3500)
+      scheduleRevert({ eyebrow: IDLE_EYEBROW, message: IDLE_MESSAGE }, 3500)
       return
     }
 
@@ -56,10 +77,28 @@ async function onSubmit() {
     }
     router.push('/chronology/check')
   } catch (err) {
+    const idle = { eyebrow: IDLE_EYEBROW, message: IDLE_MESSAGE }
     if (err instanceof PinError) {
       errorMessage.value = err.message
+      setErrorStatusCard(err.code, idle, { retryAfterMs: err.retryAfterMs })
+
+      // E3 only: the field-level text is redundant with the strip card
+      // the moment it's shown (both say "too soon"), and unlike the
+      // other error codes there's nothing for the user to go fix in the
+      // field itself — waiting is the only thing that resolves it, and
+      // the strip card is what tracks that wait. So this one clears
+      // itself quickly rather than sitting there until the field is
+      // edited (which is often "never" here — retyping the same correct
+      // PIN isn't "fixing" anything, it's just waiting).
+      if (err.code === 'E3') {
+        if (bottomErrorClearTimer) clearTimeout(bottomErrorClearTimer)
+        bottomErrorClearTimer = setTimeout(() => {
+          errorMessage.value = ''
+        }, 1000)
+      }
     } else {
       errorMessage.value = 'Verbindung fehlgeschlagen. Bitte erneut versuchen.'
+      setErrorStatusCard('E5', idle)
     }
   }
 }
@@ -81,6 +120,7 @@ async function onSubmit() {
         />
       </div>
       <p v-if="errorMessage" class="error-text">{{ errorMessage }}</p>
+
       <button type="submit" class="btn-gold" @click="spawnRipple">Anmelden</button>
     </form>
 

@@ -981,3 +981,82 @@ immediately, no dialog → toast → redirect, same as before.
 alternate full-bleed layout (blue panel on top, white strip along the
 bottom instead of the side, per a sketch) — user wants to prototype this
 next; committed the above first as a checkpoint before trying it.
+
+## Session 2026-09-04 — Portrait bottom-bar experiment, error-card polish, desktop device-frame preview
+
+**Done:**
+
+- **Portrait-only alternate layout, iterated live with the user across
+  several passes** (`main.css`, scoped to `.kiosk:not(.kiosk--card)`
+  inside `@media (orientation: portrait)` — full-bleed only, card mode
+  untouched): white strip moved to the top (`column-reverse`), blue panel
+  below. Corner rounding follows the panel wherever it currently sits
+  (top-left in this layout vs. top-right in the side-strip layout) — had
+  to also fix `.panel-complete-flash`'s hardcoded top-right radius to
+  match in both this layout and card mode, or the post-ripple flash
+  showed a rounded patch bleeding past what's now a square corner.
+  `.strip-content` uses CSS Grid (`grid-template-areas: 'logo status' /
+  'card card'`) so the logo/page-name row and the status-card row don't
+  depend on DOM order.
+- **Status card gets a real error state.** `useStatusCard.ts` gained a
+  4th tone, `'error'`, plus `setErrorStatusCard(code, idle, options)` —
+  short human-register summaries per PinErrorCode (distinct wording from
+  the exact ticket text shown under the PIN field itself — two different
+  registers for two different jobs). E3 (rate limit) is special-cased:
+  `PinError` now carries `retryAfterMs` (added to `types/timeClock.ts`
+  and computed in `api/timeClock.ts`), and the card stays red for exactly
+  that long, then flips green with a "try again now" cue — the color
+  change itself is the "time's up" signal, not a fixed guessed hold.
+  `scheduleRevert()` centralizes every auto-revert timer through one
+  `pendingRevert` slot that `setStatusCard` itself clears — fixes a real
+  bug where an earlier toast's (e.g. checkin's "Herzlich Willkommen")
+  untracked revert timer could fire later and wipe a genuinely current
+  error off the card early.
+- **E3 masking E4 after checkout, fixed**: `checkout()` also stamps
+  `lastStampAt`, so retrying immediately after checking out used to trip
+  the rate-limit check (E3, "wait a bit") before the already-checked-out
+  check (E4) ever ran — reordered so E4 (more final, more specific) wins.
+- **PIN field error text now clears the instant the user edits the
+  field** (`LoginView.vue`, `watch(pin, ...)`) instead of only on the
+  next submit — was staying stale while the user had already started
+  retyping.
+- **Status card's active-blue state now uses the panel's own gradient**
+  (`background-image: var(--pep-panel-gradient)`) instead of flat
+  `--pep-primary-blue` — the flat color read as an off/wrong blue sitting
+  right next to the panel's actual gradient.
+- **Screen-status breadcrumb redesigned**, twice, per live feedback: the
+  old `ScreenLabel.vue` caption (small caps, present on every screen in
+  the white strip) read as a tappable button sitting there for no reason.
+  First pass moved it inline into `LoginView`'s own form; final version
+  (`KioskShell.vue`) is a plain low-contrast breadcrumb (`Zeiterfassung /
+  {screen}`, thin weight, no caps/tracking, `rgba(255,255,255,.5)`) pinned
+  to the panel's own top-left/top-right corner (whichever is square, so
+  it doesn't crowd the rounded one), applied uniformly across all
+  screens. `ScreenLabel.vue` and its CSS deleted as dead code once
+  nothing referenced it anymore.
+- **Desktop device-frame preview** (`DeviceFrame.vue`, new; a few lines
+  in `main.ts`): a colleague opening the raw dev/deploy link on a laptop
+  used to see the kiosk UI full-bleed and badly proportioned. `main.ts`
+  now checks `pointer: coarse` OR `navigator.maxTouchPoints` at boot —
+  touch devices (and the `?embedded=1`-marked copy running inside the
+  frame's own `<iframe>`) mount the real app as before; anything else
+  mounts `DeviceFrame` instead, an iPad-ish bezel around a real `<iframe>`
+  of the same URL. Real iframe, not a static mockup, on purpose: it's an
+  actual nested viewport, so the app's own orientation-based CSS respons
+  correctly when the frame's rotate button swaps the iframe's
+  width/height. Device picker (iPad mini/Air/Pro + one Android reference,
+  Galaxy Tab S4) uses the same CSS-viewport sizes already validated
+  earlier this session. A `matchMedia('(pointer: coarse)')` change
+  listener reloads the page so toggling touch emulation in devtools
+  doesn't leave a stale frame/no-frame choice on screen — registered
+  unconditionally (not just in the "frame shown" branch), since the
+  first version only ever caught touch turning on, never off.
+- **Vercel/Netlify deploy prep**: `vercel.json` + `public/_redirects`
+  (SPA rewrite-to-index.html rules for both) so a quick `npx vercel` or
+  Netlify-drop deploy doesn't 404 on a direct/refreshed deep link into
+  `/chronology/check` etc. — no GitHub push required either way.
+
+**Not done / open:** the API-readiness prep items agreed earlier this
+session (`getCurrentDayState` → async, wiring the Notiz field into
+`checkout()`, formal network-error handling beyond the E5 status-card
+path) — conversation stayed on UI/UX polish instead; still pending.

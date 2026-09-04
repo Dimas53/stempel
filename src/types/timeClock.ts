@@ -26,10 +26,15 @@ export type PinErrorCode = 'E1' | 'E2' | 'E3' | 'E4' | 'E5'
 
 export class PinError extends Error {
   code: PinErrorCode
+  // Only set for E3 (rate limit) — how long, in ms, until the next stamp
+  // is actually allowed. Lets the UI show a countdown-accurate wait state
+  // instead of a fixed, made-up hold duration.
+  retryAfterMs?: number
 
-  constructor(code: PinErrorCode, message: string) {
+  constructor(code: PinErrorCode, message: string, retryAfterMs?: number) {
     super(message)
     this.code = code
+    this.retryAfterMs = retryAfterMs
   }
 }
 

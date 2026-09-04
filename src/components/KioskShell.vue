@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { Maximize2, Minimize2 } from '@lucide/vue'
 import logo from '@/assets/pepito-logo.webp'
-import ScreenLabel from '@/components/ScreenLabel.vue'
 import { useLayoutMode } from '@/composables/useLayoutMode'
 import { useStatusCard } from '@/composables/useStatusCard'
 
@@ -16,6 +15,19 @@ const { screenLabel, eyebrow, message, active, tone } = useStatusCard()
         <div class="panel-content">
           <slot />
         </div>
+
+        <!-- Breadcrumb-style status, second pass per Martin's feedback:
+             thin weight, no uppercase/tracking, low-contrast so it reads
+             as passive orientation ("where am I") rather than
+             competing for attention with the form. Pinned to the
+             panel's own top-left corner — outside the input/button's
+             vertical axis on purpose, so the eye doesn't visually
+             associate it with the form below and read it as tappable.
+             Placed after .panel-content in the DOM (not before) so it
+             paints on top of the routed view's own opaque background —
+             both are position: absolute with no explicit z-index, so
+             stacking falls back to DOM order. -->
+        <p class="panel-breadcrumb">Zeiterfassung / {{ screenLabel }}</p>
       </section>
 
       <aside class="strip">
@@ -30,6 +42,7 @@ const { screenLabel, eyebrow, message, active, tone } = useStatusCard()
               'strip-card--active': active,
               'strip-card--positive': active && tone === 'positive',
               'strip-card--pause': active && tone === 'pause',
+              'strip-card--error': active && tone === 'error',
             }"
           >
             <Transition name="strip-msg" mode="out-in">
@@ -39,13 +52,6 @@ const { screenLabel, eyebrow, message, active, tone } = useStatusCard()
               </div>
             </Transition>
           </div>
-
-          <div class="strip-status">
-            <div class="strip-divider"></div>
-            <ScreenLabel :text="screenLabel" />
-          </div>
-
-
         </div>
       </aside>
     </div>

@@ -38,10 +38,16 @@ const isPaused = ref(isCurrentlyPaused())
 const pauseStarted = ref(false)
 const pauseEnded = ref(false)
 
+// active + tone: 'pause' here too (not just from onPauseStarten's own
+// click) — arriving on this screen already mid-pause is the same state,
+// so the card should already be showing it, not sitting on the generic
+// idle blue until the user acts again.
 setStatusCard({
-  screenLabel: isPaused.value ? 'Pause beenden' : 'Menu',
+  screenLabel: isPaused.value ? 'Pause' : 'Aktion',
   eyebrow: isPaused.value ? IDLE_EYEBROW_PAUSE : IDLE_EYEBROW_MENU,
   message: isPaused.value ? IDLE_MESSAGE_PAUSE : IDLE_MESSAGE_MENU,
+  active: isPaused.value,
+  tone: isPaused.value ? 'pause' : 'default',
 })
 
 function formatTime(iso: string): string {

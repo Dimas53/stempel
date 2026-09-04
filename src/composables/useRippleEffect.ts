@@ -22,7 +22,7 @@ const PANEL_FLASH_DURATION_MS = 700
 // separate "how long to hold before the next screen/dialog appears"
 // delay, which on its own felt too long/unclear — cut by ~20%, then
 // another ~12.5% on top of that (0.8 → 0.7) once it still felt slow.
-export const ROUTE_DELAY_MS = RIPPLE_VISUALLY_DONE_MS * 0.7
+export const ROUTE_DELAY_MS = RIPPLE_VISUALLY_DONE_MS * 0.6
 
 // Shared by every full-bleed screen's buttons (Login's "Anmelden",
 // CheckView's "Pause starten"/"Pause beenden"/"Zum Checkout", CheckoutView's

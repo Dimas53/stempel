@@ -12,6 +12,13 @@ function tooSoon(lastStampAt: string | null, now: number): boolean {
   return now - new Date(lastStampAt).getTime() < MIN_STAMP_INTERVAL_MS
 }
 
+// How much of MIN_STAMP_INTERVAL_MS is actually still left — only called
+// once tooSoon() has already confirmed lastStampAt is set and recent, so
+// the result is always > 0.
+function msUntilNextStamp(lastStampAt: string, now: number): number {
+  return Math.max(MIN_STAMP_INTERVAL_MS - (now - new Date(lastStampAt).getTime()), 0)
+}
+
 export async function submitPin(pin: string): Promise<SubmitPinResult> {
   if (!pin.trim()) {
     throw new PinError('E1', 'Bitte PIN eingeben.')
@@ -25,14 +32,23 @@ export async function submitPin(pin: string): Promise<SubmitPinResult> {
   const day = getDayState(user.id)
   const now = Date.now()
 
-  if (tooSoon(day.lastStampAt, now)) {
-    throw new PinError('E3', 'Zu schnell. Bitte eine Minute warten und erneut versuchen.')
-  }
-
+  // Checked before the rate limit on purpose: checkout() also stamps
+  // lastStampAt, so immediately retrying right after checking out used to
+  // trip tooSoon() first — E3 ("wait a bit") masking E4 ("already done
+  // for today"), even though waiting doesn't fix anything here. Already
+  // checked out is the more final, more specific state; it should win.
   if (day.checkoutAt) {
     throw new PinError(
       'E4',
       'Pro Tag nur ein Checkin möglich. Sie waren heute bereits eingecheckt.',
+    )
+  }
+
+  if (tooSoon(day.lastStampAt, now)) {
+    throw new PinError(
+      'E3',
+      'Zu schnell. Bitte eine Minute warten und erneut versuchen.',
+      msUntilNextStamp(day.lastStampAt as string, now),
     )
   }
 
