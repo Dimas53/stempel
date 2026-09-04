@@ -18,7 +18,7 @@ interface StatusCardUpdate {
 // view sets this shared state directly instead.
 const screenLabel = ref('Login')
 const eyebrow = ref('Anmeldung')
-const message = ref('Bitte gib deinen PIN ein, um dich anzumelden.')
+const message = ref('Bitte geben Sie Ihren PIN ein, um sich anzumelden.')
 const active = ref(false)
 // 'positive' is for messages that are good news for the employee (e.g.
 // returning from a pause) — it swaps the card to the same green used for
@@ -113,7 +113,7 @@ export function useStatusCard() {
       scheduleRevert(
         {
           eyebrow: 'Bereit',
-          message: 'Du kannst es jetzt erneut versuchen.',
+          message: 'Sie können es jetzt erneut versuchen.',
           active: true,
           tone: 'positive',
         },

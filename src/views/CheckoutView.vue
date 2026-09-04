@@ -78,7 +78,7 @@ async function onCheckoutClick() {
   const stampedAt = await checkout(currentUser.value.id)
   showToastThenRedirect({
     eyebrow: 'Auf Wiedersehen',
-    message: `Auf Wiedersehen ${currentUser.value.firstName}, du bist jetzt ausgecheckt, ${formatTime(stampedAt)}`,
+    message: `Auf Wiedersehen, ${currentUser.value.firstName} — Sie sind jetzt ausgecheckt, ${formatTime(stampedAt)}`,
     active: true,
   })
 }

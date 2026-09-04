@@ -5,7 +5,7 @@ import { PinError, type SubmitPinResult } from '@/types/timeClock'
 // TEMP(dev-only, revert before demo/final): ticket requires 60_000 (1 minute)
 // between stamps. Shortened to 5s here purely so manual click-through
 // testing doesn't require actually waiting a full minute between steps.
-const MIN_STAMP_INTERVAL_MS = 5_000
+const MIN_STAMP_INTERVAL_MS = 10_000
 
 function tooSoon(lastStampAt: string | null, now: number): boolean {
   if (!lastStampAt) return false

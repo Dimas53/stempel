@@ -27,3 +27,4 @@ notes/
 #                     "## Session audit trail" memory section from it
 .session-ended
 .dod-run.log
+.vercel

@@ -21,7 +21,7 @@ const { spawnRipple } = useRippleEffect(panelViewRef)
 const IDLE_EYEBROW_MENU = 'Aktion wählen'
 const IDLE_MESSAGE_MENU = 'Pause starten oder auschecken?'
 const IDLE_EYEBROW_PAUSE = 'Pause aktiv'
-const IDLE_MESSAGE_PAUSE = 'Du bist aktuell in der Pause.'
+const IDLE_MESSAGE_PAUSE = 'Sie sind aktuell in der Pause.'
 
 function isCurrentlyPaused(): boolean {
   if (!currentUser.value) return false
@@ -60,7 +60,7 @@ async function onPauseStarten() {
   const stampedAt = await startPause(currentUser.value.id)
   showToastThenRedirect({
     eyebrow: 'Pause gestartet',
-    message: `${currentUser.value.firstName} ${currentUser.value.lastName}, du bist jetzt in der Pause, ${formatTime(stampedAt)}`,
+    message: `${currentUser.value.firstName} ${currentUser.value.lastName}, Sie sind jetzt in der Pause, ${formatTime(stampedAt)}`,
     active: true,
     tone: 'pause',
   })
@@ -74,7 +74,7 @@ async function onPauseBeenden() {
   // proposed by analogy — needs confirmation.
   showToastThenRedirect({
     eyebrow: 'Zurück aus der Pause',
-    message: `Willkommen zurück ${currentUser.value.firstName}, deine Pause endet um ${formatTime(stampedAt)}`,
+    message: `Willkommen zurück, ${currentUser.value.firstName} — Ihre Pause endet um ${formatTime(stampedAt)}`,
     active: true,
     tone: 'positive',
   })

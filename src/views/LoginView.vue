@@ -18,7 +18,7 @@ const panelViewRef = ref<HTMLElement | null>(null)
 const { spawnRipple } = useRippleEffect(panelViewRef)
 
 const IDLE_EYEBROW = 'Anmeldung'
-const IDLE_MESSAGE = 'Bitte gib deinen PIN ein, um dich anzumelden.'
+const IDLE_MESSAGE = 'Bitte geben Sie Ihren PIN ein, um sich anzumelden.'
 
 const pin = ref('')
 const errorMessage = ref('')
@@ -59,7 +59,7 @@ async function onSubmit() {
       pin.value = ''
       setStatusCard({
         eyebrow: 'Eingecheckt',
-        message: `Herzlich Willkommen ${result.user.firstName}, du bist jetzt eingecheckt`,
+        message: `Herzlich willkommen, ${result.user.firstName} — Sie sind jetzt eingecheckt.`,
         active: true,
       })
       scheduleRevert({ eyebrow: IDLE_EYEBROW, message: IDLE_MESSAGE }, 3500)
@@ -94,7 +94,7 @@ async function onSubmit() {
         if (bottomErrorClearTimer) clearTimeout(bottomErrorClearTimer)
         bottomErrorClearTimer = setTimeout(() => {
           errorMessage.value = ''
-        }, 1000)
+        }, 2500)
       }
     } else {
       errorMessage.value = 'Verbindung fehlgeschlagen. Bitte erneut versuchen.'
@@ -119,7 +119,9 @@ async function onSubmit() {
           class="pin-input"
         />
       </div>
-      <p v-if="errorMessage" class="error-text">{{ errorMessage }}</p>
+      <Transition name="error-text">
+        <p v-if="errorMessage" class="error-text">{{ errorMessage }}</p>
+      </Transition>
 
       <button type="submit" class="btn-gold" @click="spawnRipple">Anmelden</button>
     </form>

@@ -1060,3 +1060,26 @@ next; committed the above first as a checkpoint before trying it.
 session (`getCurrentDayState` → async, wiring the Notiz field into
 `checkout()`, formal network-error handling beyond the E5 status-card
 path) — conversation stayed on UI/UX polish instead; still pending.
+
+## Session 2026-09-04 (cont.) — Formal "Sie" everywhere, error-text timing/transition
+
+**Done:**
+
+- **Every user-facing message switched from "du" to "Sie"** (formal
+  address) — deliberate choice for this product: B2B, deployed across
+  clinics with varying internal culture, medical setting. `api/timeClock.ts`'s
+  E4 error was already accidentally "Sie" (an inconsistency flagged
+  during a full audit of every user-facing string in `src/`), which
+  settled which form to standardize on rather than the reverse. Changed:
+  `LoginView.vue`'s idle message + checkin toast, `useStatusCard.ts`'s
+  default message + E3's green follow-up, `CheckView.vue`'s idle-paused
+  message + both pause toasts, `CheckoutView.vue`'s checkout toast. Left
+  alone: E1/E2/E3(bottom)/E5 and every idle/status-card-summary string —
+  none of them address the user directly, no du/Sie distinction to make.
+- **E3's field-level error text**: hold bumped from 1s to 2.5s (was
+  disappearing before it could really be read), and it now fades +
+  collapses via a real `<Transition>` (`error-text` name, new CSS in
+  `main.css`) instead of vanishing instantly via bare `v-if` — the
+  submit button used to visibly snap upward the instant the message
+  left the DOM; animating `max-height`/`margin-top`/padding alongside
+  opacity closes that gap smoothly instead.

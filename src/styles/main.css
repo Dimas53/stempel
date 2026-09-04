@@ -1121,6 +1121,44 @@ body {
   border-radius: var(--pep-radius-lg);
   font-size: 0.9rem;
   text-align: center;
+  /* Fixed, generous cap (not "none") on purpose — max-height can't
+     transition to/from "none", it needs two concrete numbers to
+     interpolate between. 80px comfortably covers this text's longest
+     realistic wrap (2 lines) with room to spare. */
+  max-height: 80px;
+  overflow: hidden;
+}
+
+/* Fades and collapses together — without animating max-height/margin
+   too, the button below it still snapped up the instant the element
+   left the DOM, even with a smooth opacity fade running right up to
+   that moment. */
+.error-text-enter-active,
+.error-text-leave-active {
+  transition: opacity 200ms ease, transform 200ms ease, max-height 200ms ease,
+    margin-top 200ms ease, padding-top 200ms ease, padding-bottom 200ms ease;
+}
+
+.error-text-enter-from,
+.error-text-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
+  max-height: 0;
+  margin-top: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .error-text-enter-active,
+  .error-text-leave-active {
+    transition: opacity 150ms ease !important;
+  }
+
+  .error-text-enter-from,
+  .error-text-leave-to {
+    transform: none;
+  }
 }
 
 /* ==========================================================================
