@@ -1,17 +1,20 @@
 import type { DayState } from '@/types/timeClock'
 
-// In-memory only — resets on page reload, per phase-1 spec.
+// In-memory only, resets on reload. Whole file goes away with a real
+// backend — see notes/NOTES-real-api.md.
 const dayStates = new Map<string, DayState>()
 
 function emptyDayState(userId: string): DayState {
   return {
     userId,
+    date: new Date().toISOString().slice(0, 10),
     checkinAt: null,
     checkoutAt: null,
     pauseStartAt: null,
     pauseEndAt: null,
     pauseSeconds: 0,
     lastStampAt: null,
+    notiz: null,
   }
 }
 

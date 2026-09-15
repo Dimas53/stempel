@@ -499,7 +499,7 @@ body {
 
 
 
-/* Full-bleed mode, click feedback on the "Anmelden" button (see
+/* Full-bleed mode, click feedback on the "Absenden" button (see
    LoginView.vue's spawnRipple). Previous attempts: a filled white disc
    (read as a flash), three white hairline rings (read as objects flying
    apart), a soft white glow (better, but a foreign white tint sitting on
@@ -1174,9 +1174,9 @@ body {
 
 .check-name {
   color: var(--pep-white);
-  font-size: 2rem;
+  font-size: 1.6rem;
   font-weight: 700;
-  margin: 0 0 25px;
+  margin: 0 0 20px;
   text-align: center;
 }
 
@@ -1192,6 +1192,15 @@ body {
 
 .check-actions--single {
   justify-content: center;
+}
+
+/* Shown by CheckView/CheckoutView while awaiting getCurrentDayState() —
+   currently resolves instantly (mock), so this is only ever visible with
+   a real backend's actual network latency behind it. */
+.panel-loading {
+  color: var(--pep-white);
+  font-size: 1.1rem;
+  opacity: 0.8;
 }
 
 /* ==========================================================================
@@ -1530,6 +1539,54 @@ body {
   pointer-events: none;
 }
 
+/* 'Computer' view — genuinely full-bleed, not a card floating in the gray
+   .device-frame-stage: no bezel, no controls column, no shadow/rounded
+   corners. It's the top-level element in this state (see the template's
+   v-if/v-else), filling the actual viewport, same as any real website
+   would on whatever monitor is open. */
+.device-frame-computer {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  background: var(--pep-white);
+}
+
+.device-frame-computer-screen {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: var(--pep-white);
+}
+
+/* Same circular-button look as .device-frame-rotate, so it reads as part
+   of the same control language even though it's floating over the
+   content rather than sitting in the controls column. Fixed, not
+   absolute — the iframe's own content can scroll, this shouldn't move
+   with it. */
+.device-frame-computer-back {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--pep-line);
+  border-radius: 999px;
+  background: var(--pep-white);
+  color: var(--pep-mute);
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  transition: var(--pep-transition);
+}
+
+.device-frame-computer-back:hover {
+  color: var(--pep-primary-blue);
+  border-color: var(--pep-primary-blue);
+}
+
 .device-frame-controls {
   display: flex;
   flex-direction: column;
@@ -1600,5 +1657,103 @@ body {
 .device-frame-size-btn--active {
   color: var(--pep-white);
   background: var(--pep-primary-blue);
+}
+
+/* Demo-only activity log panel, see useActivityLog.ts — delete this
+   block together with that file and DeviceFrame.vue's log markup
+   whenever this stops being useful. */
+.device-frame-log {
+  width: 220px;
+  max-height: 320px;
+  padding: 12px;
+  border: 1px solid var(--pep-line);
+  border-radius: 12px;
+  background: var(--pep-white);
+  overflow-y: auto;
+}
+
+.device-frame-log-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.device-frame-log-title {
+  margin: 0;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--pep-mute);
+}
+
+.device-frame-log-clear {
+  padding: 2px 8px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  font-family: inherit;
+  color: var(--pep-mute);
+  background: none;
+  border: 1px solid var(--pep-line);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: var(--pep-transition);
+}
+
+.device-frame-log-clear:hover {
+  color: var(--pep-red-ink);
+  border-color: var(--pep-red-ink);
+}
+
+.device-frame-log-empty {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--pep-mute);
+}
+
+.device-frame-log-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* One line per entry: initials, action, time — laid out left to right
+   so a whole stamp fits without wrapping. */
+.device-frame-log-entry {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--pep-line-soft);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.device-frame-log-entry:last-child {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.device-frame-log-who {
+  flex-shrink: 0;
+  font-weight: 700;
+  color: var(--pep-primary-blue);
+}
+
+.device-frame-log-text {
+  flex: 1;
+  overflow: hidden;
+  color: var(--pep-ink);
+  text-overflow: ellipsis;
+}
+
+.device-frame-log-time {
+  flex-shrink: 0;
+  color: var(--pep-mute);
 }
 

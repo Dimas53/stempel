@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { LogIn, LogOut, Coffee, Clock, Info, Check } from '@lucide/vue'
-import { checkout, getCurrentDayState } from '@/api/timeClock'
+import { getCurrentDayState, saveNotiz } from '@/api/timeClock'
+import { logActivity } from '@/composables/useActivityLog'
 import { useRippleEffect } from '@/composables/useRippleEffect'
 import { useSession } from '@/composables/useSession'
 import { useStatusCard } from '@/composables/useStatusCard'
 import { useToastRedirect } from '@/composables/useToastRedirect'
+import type { DayState } from '@/types/timeClock'
 
 const { currentUser } = useSession()
 const { setStatusCard } = useStatusCard()
@@ -17,10 +19,19 @@ const { spawnRippleFromCorner } = useRippleEffect(panelViewRef)
 setStatusCard({
   screenLabel: 'Checkout',
   eyebrow: 'Checkout-Übersicht',
-  message: 'Bitte Zeiten prüfen und auschecken.',
+  message: 'Bitte Zeiten prüfen und optional Notiz hinterlassen.',
 })
 
-const day = currentUser.value ? getCurrentDayState(currentUser.value.id) : null
+// getCurrentDayState is async (real backend later), so loads in onMounted — same as CheckView.vue.
+const isLoading = ref(true)
+const day = ref<DayState | null>(null)
+
+onMounted(async () => {
+  if (currentUser.value) {
+    day.value = await getCurrentDayState(currentUser.value.id)
+  }
+  isLoading.value = false
+})
 
 function formatTime(iso: string | null): string {
   return iso ? new Date(iso).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : '–'
@@ -44,14 +55,12 @@ const planSummeMinutes = currentUser.value
   ? parseHM(currentUser.value.plan.checkout) - parseHM(currentUser.value.plan.checkin) - planPauseMinutes
   : 0
 
-// Actual worked time so far: elapsed since checkin, minus finalized pause
-// time. By the time a user can reach this screen they're never mid-pause
-// (CheckView only offers "Zum Checkout" outside an active pause), so
-// `pauseSeconds` is already the day's final total, not a partial one.
+// Elapsed since checkin minus pause time. Never mid-pause here (CheckView
+// only offers checkout outside an active pause), so pauseSeconds is final.
 const stempelSummeMinutes = computed(() => {
-  if (!day?.checkinAt) return 0
-  const endMs = day.checkoutAt ? new Date(day.checkoutAt).getTime() : Date.now()
-  const elapsedMs = endMs - new Date(day.checkinAt).getTime() - day.pauseSeconds * 1000
+  if (!day.value?.checkinAt) return 0
+  const endMs = day.value.checkoutAt ? new Date(day.value.checkoutAt).getTime() : Date.now()
+  const elapsedMs = endMs - new Date(day.value.checkinAt).getTime() - day.value.pauseSeconds * 1000
   return Math.max(elapsedMs, 0) / 60000
 })
 
@@ -65,20 +74,25 @@ function formatPauseSeconds(seconds: number): string {
 const notiz = ref('')
 const checkedOut = ref(false)
 
-// No confirm dialog — tried it, turned out redundant: the toast below is
-// already the "did this register?" feedback, and a second modal asking
-// to confirm before showing it just added a step.
+// No confirm dialog — the toast below already covers "did this register?".
+// checkoutAt is already written (by CheckView's button) by the time this
+// screen loads; this click just saves the Notiz, if any, and leaves.
 async function onCheckoutClick() {
   if (!currentUser.value || checkedOut.value) return
-  // Anchored at the panel's top-left corner, not the tap point — a glow
-  // centered on this specific button (sitting low on the screen) read
-  // badly, tried and rejected. This still gives the press a reaction.
+  // Anchored at the panel's corner rather than the tap point — reads
+  // better than a glow centered low on the screen.
   spawnRippleFromCorner()
   checkedOut.value = true
-  const stampedAt = await checkout(currentUser.value.id)
+
+  // Empty Notiz just leaves, per feedback — nothing to persist or log.
+  if (notiz.value.trim()) {
+    await saveNotiz(currentUser.value.id, notiz.value.trim())
+    logActivity(`${currentUser.value.firstName} ${currentUser.value.lastName}`, `Notiz: „${notiz.value.trim()}“`) // demo-only, see useActivityLog.ts
+  }
+
   showToastThenRedirect({
     eyebrow: 'Auf Wiedersehen',
-    message: `Auf Wiedersehen, ${currentUser.value.firstName} — Sie sind jetzt ausgecheckt, ${formatTime(stampedAt)}`,
+    message: `Auf Wiedersehen, ${currentUser.value.firstName} — Sie sind jetzt ausgecheckt, ${formatTime(day.value?.checkoutAt ?? null)}`,
     active: true,
   })
 }
@@ -89,8 +103,10 @@ async function onCheckoutClick() {
     <div class="checkout-content">
       <p class="check-name">{{ currentUser?.firstName }} {{ currentUser?.lastName }}</p>
 
-      <!-- Round 1 (plain table) — user compared both live and picked round
-           2 below. Kept here commented rather than deleted. -->
+      <p v-if="isLoading" class="panel-loading">Lädt…</p>
+
+      <template v-else>
+      <!-- Round 1 (plain table) — kept commented, round 2 below was picked. -->
       <!--
       <table class="checkout-table">
         <thead>
@@ -125,9 +141,7 @@ async function onCheckoutClick() {
       </table>
       -->
 
-      <!-- Round 2 — frosted-glass summary list. Active again; user liked
-           this one better after comparing, plans to revisit the icons and
-           the time formatting further later. -->
+      <!-- Round 2 — frosted-glass summary list, the picked design. -->
       <div class="checkout-summary">
         <div class="checkout-row">
           <span class="checkout-row-icon"><LogIn :size="16" /></span>
@@ -181,6 +195,7 @@ async function onCheckoutClick() {
         <LogOut v-else :size="18" />
         {{ checkedOut ? 'Ausgecheckt' : 'Checkout' }}
       </button>
+      </template>
     </div>
 
     <p class="credits">© pepito 2026 · mit ♥ gemacht von Ducito &amp; Solvi</p>

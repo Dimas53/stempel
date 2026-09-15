@@ -16,17 +16,9 @@ const { screenLabel, eyebrow, message, active, tone } = useStatusCard()
           <slot />
         </div>
 
-        <!-- Breadcrumb-style status, second pass per Martin's feedback:
-             thin weight, no uppercase/tracking, low-contrast so it reads
-             as passive orientation ("where am I") rather than
-             competing for attention with the form. Pinned to the
-             panel's own top-left corner — outside the input/button's
-             vertical axis on purpose, so the eye doesn't visually
-             associate it with the form below and read it as tappable.
-             Placed after .panel-content in the DOM (not before) so it
-             paints on top of the routed view's own opaque background —
-             both are position: absolute with no explicit z-index, so
-             stacking falls back to DOM order. -->
+        <!-- Passive orientation label, low-contrast so it doesn't compete
+             with the form. After .panel-content in the DOM so it paints
+             on top (both position: absolute, no z-index). -->
         <p class="panel-breadcrumb">Zeiterfassung / {{ screenLabel }}</p>
       </section>
 
@@ -56,9 +48,7 @@ const { screenLabel, eyebrow, message, active, tone } = useStatusCard()
       </aside>
     </div>
 
-    <!-- Dev-only toggle to compare the full-bleed split against a
-         centered fixed-size card on a neutral backdrop, per the user's
-         "let's try it as an option, not a commitment" request. -->
+    <!-- Dev-only toggle: full-bleed split vs. a centered card, for comparison. -->
     <button
       type="button"
       class="layout-toggle"

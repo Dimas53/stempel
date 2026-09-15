@@ -2,7 +2,8 @@
 import { ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Lock } from '@lucide/vue'
-import { submitPin } from '@/api/timeClock'
+import { endPause, submitPin } from '@/api/timeClock'
+import { logActivity } from '@/composables/useActivityLog'
 import { useLayoutMode } from '@/composables/useLayoutMode'
 import { ROUTE_DELAY_MS, useRippleEffect } from '@/composables/useRippleEffect'
 import { useSession } from '@/composables/useSession'
@@ -10,7 +11,7 @@ import { useStatusCard } from '@/composables/useStatusCard'
 import { PinError } from '@/types/timeClock'
 
 const router = useRouter()
-const { setCurrentUser } = useSession()
+const { setCurrentUser, setPinEnteredAt } = useSession()
 const { setStatusCard, setErrorStatusCard, scheduleRevert, tone } = useStatusCard()
 const { layoutMode } = useLayoutMode()
 
@@ -20,25 +21,19 @@ const { spawnRipple } = useRippleEffect(panelViewRef)
 const IDLE_EYEBROW = 'Anmeldung'
 const IDLE_MESSAGE = 'Bitte geben Sie Ihren PIN ein, um sich anzumelden.'
 
+function formatTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
+}
+
 const pin = ref('')
 const errorMessage = ref('')
-// Local to this file, not routed through useStatusCard's pendingRevert —
-// this only ever clears errorMessage (a plain view-local ref), it never
-// touches the shared strip card, so it doesn't need that shared
-// bookkeeping. Tracked anyway so a second E3 in quick succession cancels
-// the first one's clear instead of two competing timers both firing.
+// View-local timer, separate from useStatusCard's own revert — cancels a
+// prior pending clear if a second E3/E4 fires quickly.
 let bottomErrorClearTimer: ReturnType<typeof setTimeout> | null = null
 
-// Clears as soon as the user edits the field at all (typing further OR
-// deleting), not only once a new PIN is successfully submitted — leaving
-// a stale "PIN nicht erkannt" under a field the user has already started
-// correcting reads as if nothing they're typing now matters yet. Same
-// trigger reverts the strip card up top — but only while it's showing
-// something from THIS flow (error red, or E3's "Bereit" green follow-up):
-// this watcher also fires on the pin.value = '' resets this file does
-// itself after a successful checkin/submit, and that path already has
-// its own "Eingecheckt" message to protect (tone is 'default' there,
-// never 'error'/'positive', so this check leaves it alone).
+// Clears on any edit to the field, not just on next submit. Also reverts
+// the strip card, but only while it's showing this flow's error/positive
+// state — leaves the checkin toast alone (tone stays 'default' there).
 watch(pin, () => {
   errorMessage.value = ''
   if (tone.value === 'error' || tone.value === 'positive') {
@@ -57,21 +52,38 @@ async function onSubmit() {
 
     if (result.action === 'checkin') {
       pin.value = ''
+      logActivity(`${result.user.firstName} ${result.user.lastName}`, 'Eingecheckt', result.stampedAt) // demo-only, see useActivityLog.ts
       setStatusCard({
         eyebrow: 'Eingecheckt',
-        message: `Herzlich willkommen, ${result.user.firstName} — Sie sind jetzt eingecheckt.`,
+        message: `Herzlich willkommen, ${result.user.firstName} — Sie sind eingecheckt um ${formatTime(result.stampedAt!)}`,
         active: true,
       })
       scheduleRevert({ eyebrow: IDLE_EYEBROW, message: IDLE_MESSAGE }, 3500)
       return
     }
 
+    // Re-entering the PIN mid-pause ends it immediately, no separate
+    // "Pause beenden" tap needed — CheckView's own button stays as a
+    // fallback for anyone already sitting on that screen.
+    if (result.action === 'pause') {
+      pin.value = ''
+      const stampedAt = await endPause(result.user.id, result.stampedAt!)
+      logActivity(`${result.user.firstName} ${result.user.lastName}`, 'Pause beendet', stampedAt) // demo-only, see useActivityLog.ts
+      setStatusCard({
+        eyebrow: 'Zurück aus der Pause',
+        message: `Willkommen zurück, ${result.user.firstName} — Ihre Pause endet um ${formatTime(stampedAt)}`,
+        active: true,
+        tone: 'positive',
+      })
+      scheduleRevert({ eyebrow: IDLE_EYEBROW, message: IDLE_MESSAGE }, 3500)
+      return
+    }
+
     pin.value = ''
-    // Full mode only: hold the route change until the ripple has had time
-    // to visually land (see ROUTE_DELAY_MS) — without this, the content
-    // crossfade starts covering the button/form almost the instant it's
-    // clicked, so the ripple barely gets to grow before it's gone. Card
-    // mode has no ripple, so it navigates immediately.
+    // Stored so CheckView's Pause/Checkout buttons stamp THIS moment,
+    // not whenever they're actually clicked — see SubmitPinResult.stampedAt.
+    setPinEnteredAt(result.stampedAt!)
+    // Full mode only: let the ripple land before the route change covers it.
     if (layoutMode.value === 'full') {
       await new Promise((resolve) => setTimeout(resolve, ROUTE_DELAY_MS))
     }
@@ -82,18 +94,16 @@ async function onSubmit() {
       errorMessage.value = err.message
       setErrorStatusCard(err.code, idle, { retryAfterMs: err.retryAfterMs })
 
-      // E3 only: the field-level text is redundant with the strip card
-      // the moment it's shown (both say "too soon"), and unlike the
-      // other error codes there's nothing for the user to go fix in the
-      // field itself — waiting is the only thing that resolves it, and
-      // the strip card is what tracks that wait. So this one clears
-      // itself quickly rather than sitting there until the field is
-      // edited (which is often "never" here — retyping the same correct
-      // PIN isn't "fixing" anything, it's just waiting).
-      if (err.code === 'E3') {
+      // E3/E4 only — retyping the PIN can't fix either, so they need a
+      // timed auto-clear instead of waiting for an edit.
+      if (err.code === 'E3' || err.code === 'E4') {
         if (bottomErrorClearTimer) clearTimeout(bottomErrorClearTimer)
         bottomErrorClearTimer = setTimeout(() => {
           errorMessage.value = ''
+          // E4 only: E3's card is still mid-countdown to its own green
+          // "Bereit" reveal (up to a minute out) — clearing pin here
+          // would cut that short via the watch(pin) below.
+          if (err.code === 'E4') pin.value = ''
         }, 2500)
       }
     } else {
@@ -123,7 +133,7 @@ async function onSubmit() {
         <p v-if="errorMessage" class="error-text">{{ errorMessage }}</p>
       </Transition>
 
-      <button type="submit" class="btn-gold" @click="spawnRipple">Anmelden</button>
+      <button type="submit" class="btn-gold" @click="spawnRipple">Absenden</button>
     </form>
 
     <p class="credits">© pepito 2026 · mit ♥ gemacht von Ducito &amp; Solvi</p>

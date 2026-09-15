@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Pause, Play, LogOut, Check } from '@lucide/vue'
-import { startPause, endPause, getCurrentDayState } from '@/api/timeClock'
+import { startPause, endPause, checkout, getCurrentDayState } from '@/api/timeClock'
+import { logActivity } from '@/composables/useActivityLog'
 import { useLayoutMode } from '@/composables/useLayoutMode'
 import { ROUTE_DELAY_MS, useRippleEffect } from '@/composables/useRippleEffect'
 import { useSession } from '@/composables/useSession'
@@ -10,7 +11,7 @@ import { useStatusCard } from '@/composables/useStatusCard'
 import { useToastRedirect } from '@/composables/useToastRedirect'
 
 const router = useRouter()
-const { currentUser } = useSession()
+const { currentUser, pinEnteredAt } = useSession()
 const { setStatusCard } = useStatusCard()
 const { showToastThenRedirect } = useToastRedirect()
 const { layoutMode } = useLayoutMode()
@@ -23,31 +24,31 @@ const IDLE_MESSAGE_MENU = 'Pause starten oder auschecken?'
 const IDLE_EYEBROW_PAUSE = 'Pause aktiv'
 const IDLE_MESSAGE_PAUSE = 'Sie sind aktuell in der Pause.'
 
-function isCurrentlyPaused(): boolean {
-  if (!currentUser.value) return false
-  const day = getCurrentDayState(currentUser.value.id)
-  return !!day.pauseStartAt && !day.pauseEndAt
-}
-
-const isPaused = ref(isCurrentlyPaused())
-// Separate from the status card: this flips the clicked button's own
-// icon+label the instant it's pressed, so the confirmation isn't only
-// visible far away in the white strip. The button is disabled once
-// pressed too — there's nothing left to do on this screen but wait for
-// the redirect, so a second tap shouldn't re-fire the stamp.
+// getCurrentDayState is async (real backend later — see NOTES-real-api.md),
+// so this has to load in onMounted; isLoading gates the template until then.
+const isLoading = ref(true)
+const isPaused = ref(false)
+// Flips the clicked button's own icon+label instantly and disables it,
+// so a second tap can't re-fire the stamp before the redirect happens.
 const pauseStarted = ref(false)
 const pauseEnded = ref(false)
 
-// active + tone: 'pause' here too (not just from onPauseStarten's own
-// click) — arriving on this screen already mid-pause is the same state,
-// so the card should already be showing it, not sitting on the generic
-// idle blue until the user acts again.
-setStatusCard({
-  screenLabel: isPaused.value ? 'Pause' : 'Aktion',
-  eyebrow: isPaused.value ? IDLE_EYEBROW_PAUSE : IDLE_EYEBROW_MENU,
-  message: isPaused.value ? IDLE_MESSAGE_PAUSE : IDLE_MESSAGE_MENU,
-  active: isPaused.value,
-  tone: isPaused.value ? 'pause' : 'default',
+onMounted(async () => {
+  if (currentUser.value) {
+    const day = await getCurrentDayState(currentUser.value.id)
+    isPaused.value = !!day.pauseStartAt && !day.pauseEndAt
+  }
+  isLoading.value = false
+
+  // Arriving already mid-pause should show that state immediately, not
+  // the generic idle card.
+  setStatusCard({
+    screenLabel: isPaused.value ? 'Pause' : 'Aktion',
+    eyebrow: isPaused.value ? IDLE_EYEBROW_PAUSE : IDLE_EYEBROW_MENU,
+    message: isPaused.value ? IDLE_MESSAGE_PAUSE : IDLE_MESSAGE_MENU,
+    active: isPaused.value,
+    tone: isPaused.value ? 'pause' : 'default',
+  })
 })
 
 function formatTime(iso: string): string {
@@ -57,7 +58,9 @@ function formatTime(iso: string): string {
 async function onPauseStarten() {
   if (!currentUser.value || pauseStarted.value) return
   pauseStarted.value = true
-  const stampedAt = await startPause(currentUser.value.id)
+  // Stamps the PIN-entry moment, not this click — see SubmitPinResult.stampedAt.
+  const stampedAt = await startPause(currentUser.value.id, pinEnteredAt.value ?? new Date().toISOString())
+  logActivity(`${currentUser.value.firstName} ${currentUser.value.lastName}`, 'Pause gestartet', stampedAt) // demo-only, see useActivityLog.ts
   showToastThenRedirect({
     eyebrow: 'Pause gestartet',
     message: `${currentUser.value.firstName} ${currentUser.value.lastName}, Sie sind jetzt in der Pause, ${formatTime(stampedAt)}`,
@@ -69,9 +72,10 @@ async function onPauseStarten() {
 async function onPauseBeenden() {
   if (!currentUser.value || pauseEnded.value) return
   pauseEnded.value = true
-  const stampedAt = await endPause(currentUser.value.id)
-  // TODO(open question, docs/CONTEXT.md): toast text not in the ticket,
-  // proposed by analogy — needs confirmation.
+  // Fallback path (LoginView normally handles this) — no pinEnteredAt here, stamps now.
+  const stampedAt = await endPause(currentUser.value.id, new Date().toISOString())
+  logActivity(`${currentUser.value.firstName} ${currentUser.value.lastName}`, 'Pause beendet', stampedAt) // demo-only, see useActivityLog.ts
+  // TODO(open question, docs/CONTEXT.md): toast text not in the ticket, needs confirmation.
   showToastThenRedirect({
     eyebrow: 'Zurück aus der Pause',
     message: `Willkommen zurück, ${currentUser.value.firstName} — Ihre Pause endet um ${formatTime(stampedAt)}`,
@@ -81,12 +85,13 @@ async function onPauseBeenden() {
 }
 
 async function onZumCheckout() {
-  // Same reasoning as LoginView.vue's onSubmit: in full mode, hold the
-  // route change until the ripple has had time to visually land so the
-  // content crossfade doesn't start covering the button before the
-  // ripple's had a moment to read. Card mode has no ripple and navigates
-  // immediately. Pause starten/beenden don't need this — their own
-  // REDIRECT_DELAY_MS (2500ms) already far outlasts the ripple.
+  if (!currentUser.value) return
+  // Stamped here, not on Checkout's own button — that button is reached
+  // with everything already written, and is a formality that only saves Notiz.
+  const stampedAt = await checkout(currentUser.value.id, pinEnteredAt.value ?? new Date().toISOString())
+  logActivity(`${currentUser.value.firstName} ${currentUser.value.lastName}`, 'Ausgecheckt', stampedAt) // demo-only, see useActivityLog.ts
+
+  // Full mode only: let the ripple land before the route change covers it.
   if (layoutMode.value === 'full') {
     await new Promise((resolve) => setTimeout(resolve, ROUTE_DELAY_MS))
   }
@@ -99,7 +104,9 @@ async function onZumCheckout() {
     <div class="check-content">
       <p class="check-name">{{ currentUser?.firstName }} {{ currentUser?.lastName }}</p>
 
-      <div v-if="isPaused" class="check-actions check-actions--single">
+      <p v-if="isLoading" class="panel-loading">Lädt…</p>
+
+      <div v-else-if="isPaused" class="check-actions check-actions--single">
         <button
           type="button"
           class="btn-gold"

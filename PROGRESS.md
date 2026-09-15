@@ -1083,3 +1083,120 @@ path) — conversation stayed on UI/UX polish instead; still pending.
   submit button used to visibly snap upward the instant the message
   left the DOM; animating `max-height`/`margin-top`/padding alongside
   opacity closes that gap smoothly instead.
+
+## Session 2026-09-15 — Martin's feedback round, stamp-time architecture fix, Notiz persistence
+
+**Done — Martin's numbered feedback, all points:**
+
+- **(1)** "Anmelden" button renamed to "Absenden".
+- **(2) / feedback screenshot 4, bottom note** — the real one: pause/checkout times
+  were effectively decided by whichever button got clicked on the next
+  screen, not by the PIN entry that got the user there. Fixed with a
+  proper architecture change, not a patch: `submitPin()` (`api/timeClock.ts`)
+  now returns `stampedAt` for every action, including `'menu'`;
+  `LoginView.vue` stores it via a new `pinEnteredAt` in `useSession.ts`;
+  `startPause`/`endPause`/`checkout` (`api/timeClock.ts`) now take the
+  timestamp as an explicit parameter instead of reading `Date.now()`
+  internally; `CheckView.vue`'s Pause/Checkout buttons and
+  `CheckoutView.vue`'s Checkout button pass `pinEnteredAt` through, so
+  the stamp is always "when the PIN was entered," never "when the
+  button was eventually tapped" (even if the user sat on the menu screen
+  for minutes first). Checkout's own button on the summary screen no
+  longer writes any timestamp at all — by the time that screen is
+  reachable, `checkoutAt` is already set (written by CheckView's "Zum
+  Checkout" button); that click is now a pure formality that only saves
+  Notiz.
+- **(3)** Re-entering the PIN while on an active pause now ends the
+  pause immediately and shows the confirmation right on the Login
+  screen (`Sie sind zurück aus der Pause um ...`) — no more routing to
+  CheckView's "Pause beenden" screen for what isn't really a choice.
+  That screen's own button stays as a fallback for anyone already
+  sitting there.
+- **(4)** Fixed missing verb: "Pro Tag nur ein Checkin möglich" → "Pro
+  Tag **ist** nur ein Checkin möglich" (`api/timeClock.ts`). Also: the
+  E4 message wasn't auto-clearing — top status card already had a
+  30s generic hold, but the bottom field text had none. Added a matching
+  timed clear for E4 specifically (`E4_CARD_HOLD_MS` in
+  `useStatusCard.ts`, 2.5s — same duration as the bottom text's own
+  timer in `LoginView.vue`, so both disappear at the same moment instead
+  of the card lingering after the text is already gone). PIN field also
+  clears itself at the same 2.5s for E4 (not E3 — E3's card is still
+  mid-countdown toward its own green "Bereit" reveal, clearing the PIN
+  early would cut that short via the `watch(pin, ...)` side effect).
+- **(5)** "Wie sieht die Stempelmaske am PC aus" — answered by the
+  already-existing `DeviceFrame.vue` desktop preview, not a new build.
+  Extended it this session with a "Computer" view: fully unbezel'd,
+  no controls/log panel, the raw app filling the actual viewport like
+  any website — plus a floating button to switch back to the tablet
+  view. Selectable from the same device list as iPad mini/Air/Pro/Galaxy
+  Tab S4.
+- **(6)** Rate-limit (E3) error text rewritten to Martin's exact
+  wording: "Bitte warten Sie kurz und versuchen Sie es gleich noch
+  einmal. Sie haben in kurzer Zeit mehrfach gestempelt." (bottom/detail
+  text). The short card text ("Bitte kurz warten.") already matched,
+  untouched.
+- **(6.1)** Rate-limit logic changed from "wait a fixed interval from
+  the last stamp" to "wait until the clock's minute value changes"
+  (`sameMinute`/`msUntilNextStamp` in `api/timeClock.ts`) — stamped at
+  09:22:45 now means the next stamp is allowed at 09:23:00, not
+  09:23:45. Minute-since-epoch comparison handles hour/day rollover for
+  free. Also removed the old dev-only `MIN_STAMP_INTERVAL_MS` shortcut
+  (10s instead of the spec'd 60s) — no longer needed, the new logic is
+  correct by construction.
+
+**Done — other fixes found via live testing, not in Martin's numbered list:**
+
+- Checkin's own success message now also shows the stamped time
+  (`Sie sind eingecheckt um ...`), matching pause-end/checkout, which
+  already did.
+- Checkout screen's idle message reworded to "Bitte Zeiten prüfen und
+  optional Notiz hinterlassen."
+- **Notiz now actually persists**: new `notiz` field on `DayState`
+  (`types/timeClock.ts`, `mocks/dayState.ts`), new `saveNotiz()` in
+  `api/timeClock.ts`, wired into `CheckoutView.vue`'s Checkout button
+  (only when non-empty) — previously it was a purely local `ref`, never
+  written anywhere. Also added `date: string` ("YYYY-MM-DD") to
+  `DayState` — the mock only ever holds one record per user today, but
+  a real backend must key by `(userId, date)`, not `userId` alone, or a
+  new day's stamps collide with an existing record. Verified live via a
+  temporary `console.log` in `saveNotiz()` (removed after confirming).
+- **Demo activity log** (`useActivityLog.ts`, new; panel in
+  `DeviceFrame.vue`) — shows a live "who did what, when" list next to
+  the desktop tablet preview, backed by `localStorage`, survives reload.
+  Has a "Leeren" clear button, shows initials instead of full names (one
+  line per entry), oldest-first order. Entries now log the actual
+  persisted `stampedAt`, not the click time, matching the (2) fix above.
+  Explicitly demo-only — delete-on-sight note left in the file itself.
+- **`getCurrentDayState()` made properly async** (was a synchronous mock
+  read called during component setup in `CheckView.vue`/`CheckoutView.vue`)
+  — both now read it via `onMounted` + a `isLoading`/"Lädt…" state
+  (`.panel-loading` in `main.css`), so they're actually ready for real
+  network latency, not just pretending to be.
+- **`notes/NOTES-real-api.md` and `notes/COMMANDS.md` added** (both
+  gitignored — local-only unless `.gitignore` changes): the former is a
+  full checklist for the eventual real-backend swap (what env vars,
+  which files change, a draft REST contract, the open question about
+  E1-E5 error-code mapping, plus what's demo-only vs. permanent and
+  should be deleted once the client picks a final layout); the latter is
+  just `npm run dev`/`build`/`preview`/`type-check` + `npx vercel --prod`,
+  since none of that was documented anywhere before.
+- **Comment pass**: trimmed verbose (6-8 line) explanatory comments down
+  to 1-2 lines across most of `src/` — no logic changes, just less text
+  to read per line of code. Files touched: `DeviceFrame.vue`,
+  `LoginView.vue`, `CheckView.vue`, `CheckoutView.vue`,
+  `useStatusCard.ts`, `api/timeClock.ts`, `useActivityLog.ts`,
+  `useSession.ts`, `main.ts`, `mocks/dayState.ts`, `types/timeClock.ts`,
+  `useRippleEffect.ts`, `useToastRedirect.ts`, `KioskShell.vue`.
+
+**Not done / open:**
+- Point 5 still needs Martin to actually be shown the desktop preview —
+  the feature exists, nobody's walked him through it yet.
+- `npm run lint` is currently broken (ESLint 9 needs `eslint.config.js`,
+  project still has the old `.eslintrc`-style setup) — unrelated to this
+  session's changes, not fixed.
+- Once the client approves a final layout (full-screen vs. card), three
+  things become dead weight and should be deleted per
+  `notes/NOTES-real-api.md`'s section 0: the demo activity log, all of
+  `DeviceFrame.vue` + its `main.ts` mount branch, and whichever of
+  full/card mode didn't get picked (plus `useLayoutMode.ts`'s toggle
+  itself, if the client doesn't want to keep manual switching in prod).

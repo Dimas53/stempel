@@ -1,9 +1,7 @@
 import { useRouter } from 'vue-router'
 import { useStatusCard } from '@/composables/useStatusCard'
 
-// Third view to need "show the status card, then leave" (CheckView's two
-// call sites, now CheckoutView's) — per toast-system.md's own note to
-// revisit extracting this once that happened.
+// Extracted once CheckView + CheckoutView both needed "show card, then leave".
 const REDIRECT_DELAY_MS = 2500
 
 export function useToastRedirect() {
