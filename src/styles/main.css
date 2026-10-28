@@ -56,7 +56,7 @@
   --pep-red-ink: #a65b5b;
 
   /* Structure */
-  --pep-radius: 4px; /* matches Pepito's real desktop-scale buttons */
+  --pep-radius: 4px; /* matches the original project's real desktop-scale buttons */
   --pep-radius-lg: 6px; /* kiosk-scale controls — 10px read as too soft/rounded next to the reference */
   --pep-frame-radius: 60px; /* inner corner of the blue panel, where it meets the white strip */
   --pep-transition: color 0.15s ease-in-out, background-color 0.15s ease-in-out,
@@ -86,7 +86,7 @@
 /* Registered so the angle can be smoothly transitioned (a plain custom
    property can't be interpolated by the browser without this) — swaps
    the light/dark corners of gold buttons on press instead of just
-   dimming, per the real Pepito hover reference's "light sweeps around"
+   dimming, per the real the original project hover reference's "light sweeps around"
    feel. */
 @property --pep-gold-gradient-angle {
   syntax: '<angle>';

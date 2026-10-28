@@ -77,7 +77,7 @@
 
 ## Open Questions (Verify After Demo)
 
-1. E4 text: "Checkin" vs "Checkout" — confirm with Martin/Enrico
+1. E4 text: "Checkin" vs "Checkout" — confirm with the client
 2. Toast texts for "Pause beendet" and "Auf Wiedersehen" — team approval needed
 3. Scenario relevance (Checkin → Pause → Checkout) — ticket is ~2 years old
-4. Who approves final design: Martin, Enrico, or client?
+4. Who approves final design: the client, the client, or client?

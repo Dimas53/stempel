@@ -5,7 +5,7 @@ The agent reads this file before every UI task.
 
 Legend: 🟡 = draft / not confirmed with the team yet (mirrors the convention
 used in `notes/stempelmaske-wireframe-v3.html`). Everything else below is
-either given directly by the user or pulled verbatim from existing Pepito
+either given directly by the user or pulled verbatim from existing the original project
 production CSS.
 
 ## Colors
@@ -15,7 +15,7 @@ production CSS.
 | Name | HEX | Usage |
 |------|-----|-------|
 | `--pep-primary-blue` | `#2A8FD2` | Confirmed brand blue. Main panel fill (80% block), primary buttons, focus rings, links |
-| `--pep-primary-blue-hover` 🟡 | `#247AB3` | Derived (~15% darker). Hover/active state for blue elements. Real token name exists in Pepito's Bootstrap CSS (`--pep-primary-blue-hover`) — **ask for the actual hex used elsewhere in the app instead of this derived guess** |
+| `--pep-primary-blue-hover` 🟡 | `#247AB3` | Derived (~15% darker). Hover/active state for blue elements. Real token name exists in the original project's Bootstrap CSS (`--pep-primary-blue-hover`) — **ask for the actual hex used elsewhere in the app instead of this derived guess** |
 | `--pep-primary-blue-soft` 🟡 | `#E5F2FA` | Derived tint (~12% blue over white). Light backgrounds, badges, subtle highlights on white |
 | `--pep-focus-ring` 🟡 | `rgba(42,143,210,.5)` | Focus halo, matches Bootstrap pattern `0 0 0 .25rem rgba(color,.5)` |
 
@@ -36,7 +36,7 @@ keep these and treat them as final-ish:
 
 | Name | HEX | Usage |
 |------|-----|-------|
-| `--pep-white` | `#FFFFFF` | Base background, per ITO login reference ("white background, blue as an accent, not a fill") |
+| `--pep-white` | `#FFFFFF` | Base background, per reference login reference ("white background, blue as an accent, not a fill") |
 | `--pep-ink` | `#1A2230` | Primary text |
 | `--pep-mute` | `#6B7688` | Secondary text, placeholders |
 | `--pep-line` | `#C7CEDB` | Borders, dividers |
@@ -45,8 +45,8 @@ keep these and treat them as final-ish:
 
 ### Accent — gold (Pause actions)
 
-Pulled **verbatim** from an existing Pepito component
-(`.pepito-button.primary`) — not a new invention, so it stays consistent
+Pulled **verbatim** from an existing the original project component
+(`a reference button`) — not a new invention, so it stays consistent
 with what the app already ships elsewhere. Ticket calls for "yellow" on
 Pause buttons; this gold treatment is a stronger, more premium take on
 that same requirement:
@@ -65,7 +65,7 @@ background-image: linear-gradient(45deg, #C8A04B 30%, #DAB264 45%, #E3C996 58%, 
 background-size: 200% 200%;
 background-position: 50%;
 ```
-**Resolved — hover behavior**: taken from a real Pepito button reference
+**Resolved — hover behavior**: taken from a real the original project button reference
 (`Demotermin buchen`). Triggered on hover only, two things happen
 together: the gradient's `background-position` shifts (30% 30% → 80%
 70%) and the whole button darkens (`filter: brightness(0.92)`). First
@@ -95,9 +95,9 @@ and keep error *text* in `--pep-ink`, not white, unless tested otherwise.
 
 ## Typography
 
-🟡 Not specified yet. Neither reference screenshot (ITO login, wireframe)
+🟡 Not specified yet. Neither reference screenshot (reference login, wireframe)
 uses a distinctive custom font — both read as system-default. Proposal:
-keep the wireframe's stack until/unless Pepito has a brand font:
+keep the wireframe's stack until/unless the original project has a brand font:
 ```
 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif
 ```
@@ -108,7 +108,7 @@ keep the wireframe's stack until/unless Pepito has a brand font:
 
 ## Layout & Composition
 
-Confirmed direction (differs deliberately from the ITO login reference,
+Confirmed direction (differs deliberately from the reference login reference,
 see comparison below):
 
 - **Split screen, 80 / 20** in landscape, **75 / 25** in portrait — not
@@ -121,13 +121,10 @@ see comparison below):
     block.
   - **Right, 20% (25% portrait)** — `--pep-white`, confirmed flat white
     for now (no mascot or gray tint yet in the schematic mock).
-- **Logo**: `src/assets/pepito-logo.webp` — user's own asset, placed
-  directly in `src/assets/`. (A vector `pepito-by-solvi.svg` was found in
-  `~/Downloads` and tried briefly — user didn't recognize/want it, reverted.
-  `pepito-logo.png` also sits unused in `src/assets/`, a tighter-crop
-  variant, kept per "leave it as is.") Positioned top-right of the white
+- **Logo**: `src/assets/stempel-logo.svg` — own vector asset (clock-stamp
+  icon + "Stempel" wordmark), favicon `public/favicon.svg`. Positioned top-right of the white
   strip (top area; the "Login" pill and footer own the bottom). Opposite
-  corner from the ITO reference (logo top-left, inside the form panel) —
+  corner from the reference (logo top-left, inside the form panel) —
   intentional, not an oversight.
 - Confirmed via schematic mock (`Screenshot 2026-09-02 at 13.05.50.jpg`):
   panel ratio reads close to 80/20, PIN field is a single plain input
@@ -171,11 +168,8 @@ see comparison below):
   narrow on the white side at this smaller absolute size), buttons/PIN
   input stretch full-width instead of staying content-sized. Not a
   decision yet — a live A/B to react to.
-- **Footer credit line**: moved from the white strip to the **blue
-  panel**, centered horizontally, near the bottom, **white text**
-  (`rgba(255,255,255,.8)`) — `© pepito 2026 · mit ♥ gemacht von Ducito &
-  Solvi`. The white strip is too narrow for this line without wrapping
-  awkwardly; the blue panel has the room.
+- **Footer credit line**: removed (the kiosk is not a website, no footer needed).
+  The `.credits` CSS and the card-mode bottom padding are leftovers.
 - **White strip now does double duty as a status message slot**: the
   checkin "Herzlich Willkommen" text moved off the blue-panel toast
   overlay (removed entirely) into the white strip, vertically roughly
@@ -199,17 +193,17 @@ see comparison below):
   outline.
 - 🟡 **Mascot** (open idea, not committed): inspired by the MarcoPolo World
   School reference — a character peeking in from the panel edge with a
-  speech bubble. Worth noting: ITO's own "Hej!" login screen already uses
+  speech bubble. Worth noting: the reference app's own "Hej!" login screen already uses
   a bespectacled, bow-tie mascot on the blue panel — reusing *that*
   character instead of designing a new one would tie Stempelmaske
-  visually back to the existing ITO/Pepito identity rather than
+  visually back to the existing original identity rather than
   introducing an unrelated mascot. The latest schematic mock shows no
   mascot at all (just the logo) — treat as dropped for v1 unless the user
   says otherwise.
 
 ### Reference comparison
 
-| | ITO login (`Hej!` screenshot) | Stempelmaske (this project) |
+| | reference login (`Hej!` screenshot) | Stempelmaske (this project) |
 |---|---|---|
 | Blue panel role | Branding / greeting only | Functional — contains the form |
 | Blue panel size | ~55% | 80% |
@@ -358,7 +352,7 @@ above for why.
 
 ### Buttons — shared structural tokens
 
-Extracted from Pepito's real Bootstrap-based `.btn` class. These are
+Extracted from the original project's real Bootstrap-based `.btn` class. These are
 **structural** tokens (spacing/radius/shadow/transition), reusable across
 all three button colors above — only the color variables swap per variant
 (`--bs-btn-bg`, `--bs-btn-border-color`, etc. → our blue/gold/green).
@@ -443,7 +437,7 @@ use: `Lock` icon inside the PIN input.
 1. Hover hex for gold and green variants — only blue has a derived guess.
 2. Real value of `--pep-primary-blue-hover` — is `#247AB3` close enough,
    or is there an exact production value to copy?
-3. Font family — reuse an existing Pepito brand font, or is system-default
+3. Font family — reuse an existing the original project brand font, or is system-default
    fine for this kiosk app?
 4. ~~Icon package~~ — resolved, `@lucide/vue`.
 5. Mascot — schematic mock shows none; treat as dropped for v1 unless told
@@ -451,9 +445,9 @@ use: `Lock` icon inside the PIN input.
 6. Green (`#D2F0C8`) and gold need to be seen live before calling them
    final — user explicitly wants to judge them in the running app, not on
    paper.
-7. ~~Real pepito logo asset~~ — resolved. (A vector SVG was tried and
+7. ~~Real logo asset~~ — resolved. (A vector SVG was tried and
    reverted per the user's own request — current asset is their
-   `pepito-logo.webp`, not a vector.)
+   `stempel-logo.svg`, not a vector.)
 8. **Responsive behavior below tablet width — untested, open.** Only
    breakpoint that exists is `@media (orientation: portrait)` (80%→75%
    panel split), aimed at a portrait *iPad*, not narrow phone widths.

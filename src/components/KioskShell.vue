@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Maximize2, Minimize2 } from '@lucide/vue'
-import logo from '@/assets/pepito-logo.webp'
+import logo from '@/assets/stempel-logo.svg'
 import { useLayoutMode } from '@/composables/useLayoutMode'
 import { useStatusCard } from '@/composables/useStatusCard'
 
@@ -25,7 +25,7 @@ const { screenLabel, eyebrow, message, active, tone } = useStatusCard()
       <aside class="strip">
         <div class="strip-content">
           <div class="logo">
-            <img :src="logo" alt="pepito" />
+            <img :src="logo" alt="Stempel" />
           </div>
 
           <div

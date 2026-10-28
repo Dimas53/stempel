@@ -39,7 +39,7 @@ Error shown → user corrects → retry
 
 - E1-E4 shown as inline errors below PIN field — keeps context visible, user can retry immediately
 - E3 can appear on any screen (check/pause/checkout) — minimum 1 minute rule is global
-- E4 text is verbatim from original ticket — do not "fix" wording until Martin/Enrico confirm
+- E4 text is verbatim from original ticket — do not "fix" wording until the client confirm
 - E5 is simulated (dev mode button) — no real network calls in prototype
 
 ## Gotchas

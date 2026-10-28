@@ -10,7 +10,7 @@
 | `npm run lint` | Lint check |
 | `npm run type-check` | TypeScript type check |
 
-Port 3001 chosen because 3000 is occupied by another project (itocook).
+Port 3001 chosen because 3000 is occupied by another project (another project).
 
 ## Risk Levels
 

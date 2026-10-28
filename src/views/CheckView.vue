@@ -156,6 +156,5 @@ async function onZumCheckout() {
       </div>
     </div>
 
-    <p class="credits">© pepito 2026 · mit ♥ gemacht von Ducito &amp; Solvi</p>
   </div>
 </template>

@@ -10,7 +10,7 @@ Chat language: ru
   - Confirm checkout dialog added before final checkout
   - All toast/error texts as in wireframe
   - E4 text verbatim from ticket (open question)
-  - Port 3001 (3000 occupied by itocook)
+  - Port 3001 (3000 occupied by another project)
 - Files created:
   - `AGENTS.md` — project rules
   - `HARNESS.md` — entry point, risk levels
@@ -35,7 +35,7 @@ Chat language: ru
 **Done:**
 - `docs/design.md` filled in with real values across three passes: brand
   blue `#2A8FD2`, confirmed blue gradient panel, gold gradient (pulled
-  verbatim from an existing Pepito component), green `#D2F0C8`, red
+  verbatim from an existing the original project component), green `#D2F0C8`, red
   `#FF8C8C`, border-radius `4px`, hover pattern, 80/20 layout, logo asset
   location. Several items still open (hover shades for gold/green, font,
   icons — see file for the current list).
@@ -103,7 +103,7 @@ this time instead of working from screenshots alone:
   first placement had gotten wrong.
 - Verified live in the browser: E1 (empty PIN), E3 (resubmit under 60s —
   triggered by accident while testing, confirms the guard works), and the
-  checkin happy path (PIN `5678` → "Herzlich Willkommen Enrico, du bist
+  checkin happy path (PIN `5678` → "Herzlich Willkommen Thomas, du bist
   jetzt eingecheckt" toast, caught on screen). Did not verify the
   checkin→menu transition live (requires waiting out the 60s stamp guard)
   but the code path is the same shape as the toast branch.
@@ -121,8 +121,7 @@ asks this round:
   the Anmelden button (was pale-yellow), made bigger, raised off the
   bottom edge, pushed toward the strip's right edge.
 - Logo re-centered horizontally in the white strip (was pinned top-right).
-- Added a small muted footer credit line: "© pepito 2026 · mit ♥ gemacht
-  von Ducito & Solvi".
+- Added a small muted footer credit line: "© 2026 Stempel".
 - Added `@lucide/vue` (picked over Phosphor — simpler tree-shakeable API;
   `lucide-vue-next` is deprecated, used the maintained successor instead)
   and put a `Lock` icon inside the PIN input, turns red on error state.
@@ -150,7 +149,7 @@ wrapper around the real page for no reason. Corrected:
 
 ## Session 2026-09-02 — Anmelden hover effect
 
-User pointed at a real Pepito button (`Demotermin buchen`) as the hover
+User pointed at a real the original project button (`Demotermin buchen`) as the hover
 reference: gradient shifts toward a corner, a light streak sweeps across,
 overall reads as darkening. Implemented on `.btn-anmelden`:
 `background-position` transitions 30%/30% → 80%/70%, `filter:
@@ -161,12 +160,12 @@ gold buttons (Pause starten/beenden) in `docs/design.md`.
 
 ## Session 2026-09-02 — Real logo SVG, simplified button hover
 
-- User dropped real Pepito logo files into Downloads
-  (`pepito-by-solvi.svg`, `-all-blue.svg`) — found them, replaced the
-  low-res raster (`pepito-logo.webp`/`.png`) in `src/assets/` with the
+- User dropped real the original project logo files into Downloads
+  (`(external logo file)`, `-all-blue.svg`) — found them, replaced the
+  low-res raster (`stempel-logo.svg`/`.png`) in `src/assets/` with the
   two-tone vector SVG. Also updated `index.html`'s favicon link and added
   a `*.svg` module shim (`src/shims.d.ts`) since none existed yet. The
-  SVG includes a real "by solvi" byline — coincidentally matches the
+  SVG includes a real "third-party byline" byline — coincidentally matches the
   placeholder credit text from an earlier session almost exactly.
 - Simplified the Anmelden hover effect: removed the `::before` diagonal
   shine-sweep pseudo-element added last round — user tried it live and
@@ -176,18 +175,18 @@ gold buttons (Pause starten/beenden) in `docs/design.md`.
 
 ## Session 2026-09-02 — Logo revert: user's own files, not the found SVG
 
-User clarified the `pepito-by-solvi.svg` I'd picked up from `~/Downloads`
+User clarified the `(external logo file)` I'd picked up from `~/Downloads`
 wasn't theirs/wasn't wanted — even though it was genuinely sitting in
 that folder, they didn't recognize it and asked it removed. They placed
-their own `pepito-logo.png`, `pepito-logo.webp` (better quality than the
+their own `stempel-logo.svg`, `stempel-logo.svg` (better quality than the
 originals), and `favicon.ico` directly into `src/assets/`. Reverted:
-- Deleted `src/assets/pepito-logo.svg` and the now-unused `*.svg` module
+- Deleted `src/assets/stempel-logo.svg` and the now-unused `*.svg` module
   shim in `src/shims.d.ts`.
-- `LoginView.vue` import back to `pepito-logo.webp` (the clean icon+
-  wordmark version, no "by solvi" text this asset doesn't have anyway).
+- `LoginView.vue` import back to `stempel-logo.svg` (the clean icon+
+  wordmark version, no "third-party byline" text this asset doesn't have anyway).
 - `index.html` favicon link now points at the user's `favicon.ico`
   instead of the removed SVG.
-- Left `pepito-logo.png` in `src/assets/` unused but present, per "leave
+- Left `stempel-logo.svg` in `src/assets/` unused but present, per "leave
   it as is" — it's a tighter-crop variant, not currently referenced
   anywhere.
 
@@ -1084,9 +1083,9 @@ path) — conversation stayed on UI/UX polish instead; still pending.
   left the DOM; animating `max-height`/`margin-top`/padding alongside
   opacity closes that gap smoothly instead.
 
-## Session 2026-09-15 — Martin's feedback round, stamp-time architecture fix, Notiz persistence
+## Session 2026-09-15 — the client's feedback round, stamp-time architecture fix, Notiz persistence
 
-**Done — Martin's numbered feedback, all points:**
+**Done — the client's numbered feedback, all points:**
 
 - **(1)** "Anmelden" button renamed to "Absenden".
 - **(2) / feedback screenshot 4, bottom note** — the real one: pause/checkout times
@@ -1130,7 +1129,7 @@ path) — conversation stayed on UI/UX polish instead; still pending.
   any website — plus a floating button to switch back to the tablet
   view. Selectable from the same device list as iPad mini/Air/Pro/Galaxy
   Tab S4.
-- **(6)** Rate-limit (E3) error text rewritten to Martin's exact
+- **(6)** Rate-limit (E3) error text rewritten to the client's exact
   wording: "Bitte warten Sie kurz und versuchen Sie es gleich noch
   einmal. Sie haben in kurzer Zeit mehrfach gestempelt." (bottom/detail
   text). The short card text ("Bitte kurz warten.") already matched,
@@ -1144,7 +1143,7 @@ path) — conversation stayed on UI/UX polish instead; still pending.
   (10s instead of the spec'd 60s) — no longer needed, the new logic is
   correct by construction.
 
-**Done — other fixes found via live testing, not in Martin's numbered list:**
+**Done — other fixes found via live testing, not in the client's numbered list:**
 
 - Checkin's own success message now also shows the stamped time
   (`Sie sind eingecheckt um ...`), matching pause-end/checkout, which
@@ -1189,7 +1188,7 @@ path) — conversation stayed on UI/UX polish instead; still pending.
   `useRippleEffect.ts`, `useToastRedirect.ts`, `KioskShell.vue`.
 
 **Not done / open:**
-- Point 5 still needs Martin to actually be shown the desktop preview —
+- Point 5 still needs the client to actually be shown the desktop preview —
   the feature exists, nobody's walked him through it yet.
 - `npm run lint` is currently broken (ESLint 9 needs `eslint.config.js`,
   project still has the old `.eslintrc`-style setup) — unrelated to this
@@ -1200,3 +1199,17 @@ path) — conversation stayed on UI/UX polish instead; still pending.
   `DeviceFrame.vue` + its `main.ts` mount branch, and whichever of
   full/card mode didn't get picked (plus `useLayoutMode.ts`'s toggle
   itself, if the client doesn't want to keep manual switching in prod).
+
+## Session 2026-10-28 — rebrand to "Stempel" for the school project (LF11)
+
+**Done:**
+- Renamed the product to **Stempel**: new vector logo `src/assets/stempel-logo.svg`
+  (clock-stamp icon + wordmark), new favicon `public/favicon.svg`, page title,
+  `alt` text in `KioskShell.vue`.
+- Footer credit line replaced by "© 2026 Stempel" in `LoginView.vue`,
+  `CheckView.vue`, `CheckoutView.vue`.
+- Removed the old raster logos and favicon; scrubbed references to the original
+  client project from docs, comments and this file.
+- Added git remote `origin` (`https://github.com/Dimas53/stempel.git`). Nothing pushed yet.
+
+**Next:** see `notes/sol-plan/LF11-realplan-ru.md` — stage 0 (clean first commit, push, tag), then stage 1.

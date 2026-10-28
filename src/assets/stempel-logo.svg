@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 316 88" role="img" aria-label="Stempel">
+  <g transform="translate(4 3.5) scale(1.12)">
+    <circle cx="36" cy="36" r="36" fill="#2f6fa6"/>
+    <circle cx="36" cy="36" r="31.5" fill="#5aa0d8"/>
+    <g stroke="#ffffff" stroke-linecap="round" stroke-width="2">
+      <line x1="36" y1="7.5" x2="36" y2="10.5" transform="rotate(30 36 36)"/>
+      <line x1="36" y1="7.5" x2="36" y2="10.5" transform="rotate(60 36 36)"/>
+      <line x1="36" y1="7.5" x2="36" y2="10.5" transform="rotate(120 36 36)"/>
+      <line x1="36" y1="7.5" x2="36" y2="10.5" transform="rotate(150 36 36)"/>
+      <line x1="36" y1="7.5" x2="36" y2="10.5" transform="rotate(210 36 36)"/>
+      <line x1="36" y1="7.5" x2="36" y2="10.5" transform="rotate(240 36 36)"/>
+      <line x1="36" y1="7.5" x2="36" y2="10.5" transform="rotate(300 36 36)"/>
+      <line x1="36" y1="7.5" x2="36" y2="10.5" transform="rotate(330 36 36)"/>
+    </g>
+    <g fill="#ffffff" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" font-weight="700" text-anchor="middle">
+      <text x="36" y="19.5">12</text>
+      <text x="56.5" y="40">3</text>
+      <text x="36" y="60.5">6</text>
+      <text x="15.5" y="40">9</text>
+    </g>
+    <g fill="#ffffff" transform="translate(36 36) scale(0.7) translate(-36 -36)">
+      <circle cx="36" cy="23" r="6.5"/>
+      <rect x="32" y="28" width="8" height="10"/>
+      <rect x="22" y="38" width="28" height="9" rx="3"/>
+      <rect x="20" y="52" width="32" height="3.5" rx="1.75"/>
+    </g>
+  </g>
+  <line x1="106" y1="20" x2="106" y2="68" stroke="#c7cedb" stroke-width="1.5"/>
+  <text x="124" y="60" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="46" font-weight="500" fill="#706f6f">Stempel</text>
+</svg>

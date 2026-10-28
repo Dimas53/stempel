@@ -82,11 +82,11 @@ Checkout is irreversible for the day. Without confirmation, an accidental tap en
 
 ### Why port 3001?
 
-Port 3000 is occupied by another project (itocook). Vite dev server runs on 3001 to avoid conflicts.
+Port 3000 is occupied by another project (another project). Vite dev server runs on 3001 to avoid conflicts.
 
 ## Gotchas
 
 - PIN field must have `autocomplete="off"` and `type="password"` — browsers love to autofill kiosk PINs
 - Minimum 1 minute between stamps — enforced in state machine, not just UI
 - Toast texts use dynamic variables (`[Vorname]`, `[Uhrzeit]`) — not literal strings
-- E4 error text is verbatim from the original ticket — do not "fix" the wording until Martin/Enrico confirm
+- E4 error text is verbatim from the original ticket — do not "fix" the wording until the client confirm

@@ -30,6 +30,6 @@ Ubiquitous language for the time clock terminal prototype.
 
 ## Open Questions
 
-- E4 text says "Checkin" but rule is about "one checkout per day" — awaiting confirmation from Martin/Enrico
+- E4 text says "Checkin" but rule is about "one checkout per day" — awaiting confirmation from the client
 - Toast texts for "Pause beendet" and "Auf Wiedersehen" — placeholders, need team approval
 - Scenario relevance (Checkin → Pause → Checkout) — ticket is ~2 years old, verify with team after demo
